@@ -184,9 +184,7 @@ class IndicesClient {
 public:
     IndicesClient(std::string url)
         : url_(url)
-    {
-        LOG_TRACE << url;
-    }
+    {}
     ~IndicesClient() {}
 public:
     CreateIndexResponsePtr create(std::string indexName, const CreateIndexParam &param = CreateIndexParam());
