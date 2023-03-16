@@ -110,12 +110,12 @@ std::string CreateIndexParam::toJsonString() const {
         properties[item->property_name_] = propertyValue;
     }
 
-    Json::Value doc_;
-    doc_["properties"] = properties;
+    Json::Value _doc;
+    _doc["properties"] = properties;
 
-    Json::Value mapping;
-    mapping["doc_"] = doc_;
-    result["mapping"] = mapping;
+    Json::Value mappings;
+    mappings["_doc"] = _doc;
+    result["mappings"] = mappings;
 
     return result.toStyledString();
 }
