@@ -10,8 +10,10 @@
 #include <cstdio>
 #include <drogon/plugins/Plugin.h>
 #include <exception>
+#include <json/value.h>
 #include <memory>
 #include <regex>
+#include <trantor/utils/Date.h>
 #include <trantor/utils/Logger.h>
 #include <unordered_map>
 
@@ -30,6 +32,10 @@ class Property;
 using PropertyPtr = std::shared_ptr<Property>;
 class CreateIndexParam;
 using CreateIndexParamPtr = std::shared_ptr<CreateIndexParam>;
+class Settings;
+using SettingsPtr = std::shared_ptr<Settings>;
+class GetIndexResponse;
+using GetIndexResponsePtr = std::shared_ptr<GetIndexResponse>;
 class IndicesClient;
 using IndicesClientPtr = std::shared_ptr<IndicesClient>;
 
@@ -46,7 +52,6 @@ public:
         : message_(std::move(message))
     {}
     ElasticSearchException() = delete;
-
 private:
     std::string message_;
 };
@@ -180,6 +185,25 @@ private:
     std::vector<PropertyPtr> properties_;
 };
 
+class Settings {
+private:
+    trantor::Date creation_date_;
+    int32_t number_of_shards_;
+    int32_t number_of_replicas_;
+    std::string uuid_;
+    std::string version_;
+    std::string provided_name_;
+};
+
+class GetIndexResponse {
+public:
+    void setByJson(const std::shared_ptr<Json::Value>&responseBody);
+private:
+    std::vector<PropertyPtr> properties_;
+    std::vector<std::string> alias_;
+    SettingsPtr settings_;
+};
+
 class GetIndexParam {
 public:
     GetIndexParam(std::string index)
@@ -202,6 +226,12 @@ public:
         std::function<void (CreateIndexResponsePtr &)> &&resultCallback,
         std::function<void (ElasticSearchException &&)> &&exceptionCallback,
         const CreateIndexParam &param = CreateIndexParam());
+
+    GetIndexResponsePtr get(std::string indexName);
+    void get(
+        std::string indexName,
+        std::function<void (GetIndexResponsePtr &)> &&resultCallback,
+        std::function<void (ElasticSearchException &&)> &&exceptionCallback);
 private:
     std::string url_;
 };
