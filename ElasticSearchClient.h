@@ -180,6 +180,15 @@ private:
     std::vector<PropertyPtr> properties_;
 };
 
+class GetIndexParam {
+public:
+    GetIndexParam(std::string index)
+        : index_(index)
+    {}
+private:
+    std::string index_;
+};
+
 class IndicesClient {
 public:
     IndicesClient(std::string url)
