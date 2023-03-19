@@ -154,6 +154,41 @@ enum PropertyType {
     DATE,
 };
 
+inline PropertyType string2PropertyType(std::string &str) {
+    PropertyType result;
+    if (str == "TEXT") {
+        result = TEXT;
+    }
+    if (str == "KEYWORD") {
+        result = KEYWORD;
+    }
+    if (str == "LONG") {
+        result = LONG;
+    }
+    if (str == "INTEGER") {
+        result = INTEGER;
+    }
+    if (str == "SHORT") {
+        result = SHORT;
+    }
+    if (str == "BYTE") {
+        result = BYTE;
+    }
+    if (str == "DOUBLE") {
+        result = DOUBLE;
+    }
+    if (str == "FLOAT") {
+        result = FLOAT;
+    }
+    if (str == "BOOLEAN") {
+        result = BOOLEAN;
+    }
+    if (str == "DATE") {
+        result = DATE;
+    }
+    return result;
+}
+
 class Property {
     friend class CreateIndexParam;
 public:
@@ -165,6 +200,16 @@ public:
         type_(type),
         analyzer_(analyzer)
     {}
+public:
+    std::string getPropertyName() {
+        return property_name_;
+    }
+    PropertyType getType() {
+        return type_;
+    }
+    std::string getAnalyzer() {
+        return analyzer_;
+    }
 private:
     std::string property_name_;
     PropertyType type_;
@@ -186,31 +231,51 @@ private:
 };
 
 class Settings {
+public:
+    void setByJson(const std::shared_ptr<Json::Value> &json);
+    trantor::Date getCreationDate() {
+        return creation_date_;
+    }
+    int32_t getNumberOfShards() {
+        return number_of_shards_;
+    }
+    int32_t getNumberOfReplicas() {
+        return number_of_replicas_;
+    }
+    std::string getUuid() {
+        return uuid_;
+    }
+    std::string getVersionCreated() {
+        return version_created_;
+    }
+    std::string getProvidedName() {
+        return provided_name_;
+    }
 private:
     trantor::Date creation_date_;
     int32_t number_of_shards_;
     int32_t number_of_replicas_;
     std::string uuid_;
-    std::string version_;
+    std::string version_created_;
     std::string provided_name_;
 };
 
 class GetIndexResponse {
 public:
     void setByJson(const std::shared_ptr<Json::Value>&responseBody);
+    std::vector<PropertyPtr> getProperties() {
+        return properties_;
+    }
+    std::vector<std::string> getAliases() {
+        return aliases_;
+    }
+    SettingsPtr getSettings() {
+        return settings_;
+    }
 private:
     std::vector<PropertyPtr> properties_;
-    std::vector<std::string> alias_;
+    std::vector<std::string> aliases_;
     SettingsPtr settings_;
-};
-
-class GetIndexParam {
-public:
-    GetIndexParam(std::string index)
-        : index_(index)
-    {}
-private:
-    std::string index_;
 };
 
 class IndicesClient {
