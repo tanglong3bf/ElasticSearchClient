@@ -135,6 +135,10 @@ void GetIndexResponse::setByJson(const std::shared_ptr<Json::Value> &responseBod
     this->settings_->setByJson(make_shared<Json::Value>(settings));
 }
 
+void DeleteIndexResponse::setByJson(const std::shared_ptr<Json::Value> &response) {
+    this->acknowledged_ = response->get("acknowledged", false).asBool();
+}
+
 CreateIndexResponsePtr IndicesClient::create(std::string indexName, const CreateIndexParam &param) {
     shared_ptr<promise<CreateIndexResponsePtr>> pro(new promise<CreateIndexResponsePtr>);
     auto f = pro->get_future();
@@ -267,6 +271,75 @@ void IndicesClient::get(
             } else {
                 GetIndexResponsePtr response = std::make_shared<GetIndexResponse>();
                 response->setByJson(std::make_shared<Json::Value>(responseBody->get(indexName, {})));
+                resultCallback(response);
+            }
+        }
+    });
+}
+
+DeleteIndexResponsePtr IndicesClient::deleteIndex(std::string indexName) {
+    shared_ptr<promise<DeleteIndexResponsePtr>> pro(new promise<DeleteIndexResponsePtr>);
+    auto f = pro->get_future();
+    this->deleteIndex(indexName, [&pro](DeleteIndexResponsePtr &response) {
+        try {
+            pro->set_value(response);
+        }
+        catch (...) {
+            pro->set_exception(std::current_exception());
+        }
+    }, [&pro](ElasticSearchException &&err){
+        pro->set_exception(std::make_exception_ptr(err));
+    });
+    return f.get();
+}
+
+void IndicesClient::deleteIndex(
+    std::string indexName,
+    std::function<void (DeleteIndexResponsePtr &)> &&resultCallback,
+    std::function<void (ElasticSearchException &&)> &&exceptionCallback) {
+
+    string path("/");
+    path += indexName;
+
+    auto req = HttpRequest::newHttpRequest();
+    req->setMethod(Delete);
+    req->setPath(path);
+    req->setContentTypeCode(CT_APPLICATION_JSON);
+
+    auto client = HttpClient::newHttpClient(url_);
+    client->sendRequest(req, [
+        this,
+        &indexName,
+        resultCallback = move(resultCallback),
+        exceptionCallback = move(exceptionCallback)
+    ] (ReqResult result, const HttpResponsePtr &response) {
+        if (result != ReqResult::Ok) {
+            string errorMessage = "error while sending request to server! url: [";
+            errorMessage +=  url_;
+            errorMessage +=  "], result: [";
+            errorMessage +=  to_string(result);
+            errorMessage +=  "].";
+
+            LOG_WARN << errorMessage;
+            exceptionCallback(ElasticSearchException(errorMessage));
+        } else {
+            auto responseBody = response->getJsonObject();
+
+            LOG_TRACE << responseBody->toStyledString();
+
+            if (responseBody->isMember("error")) {
+                auto error = responseBody->get("error", {});
+                auto type = error.get("type", {}).asString();
+                auto reason = error.get("reason", {}).asString();
+                string errorMessage = "ElasticSearchException [type=";
+                errorMessage += type;
+                errorMessage += ", reason=";
+                errorMessage += reason;
+                errorMessage += "]";
+                exceptionCallback(ElasticSearchException(errorMessage));
+            } else {
+                DeleteIndexResponsePtr response = std::make_shared<DeleteIndexResponse>();
+                response->setByJson(responseBody);
                 resultCallback(response);
             }
         }
