@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <drogon/HttpTypes.h>
 #include <drogon/plugins/Plugin.h>
 #include <exception>
 #include <json/value.h>
@@ -30,6 +31,8 @@ class Settings;
 using SettingsPtr = std::shared_ptr<Settings>;
 class GetIndexResponse;
 using GetIndexResponsePtr = std::shared_ptr<GetIndexResponse>;
+class DeleteIndexResponse;
+using DeleteIndexResponsePtr = std::shared_ptr<DeleteIndexResponse>;
 class IndicesClient;
 using IndicesClientPtr = std::shared_ptr<IndicesClient>;
 
@@ -205,6 +208,16 @@ private:
     SettingsPtr settings_;
 };
 
+class DeleteIndexResponse {
+public:
+    void setByJson(const std::shared_ptr<Json::Value>&responseBody);
+    bool isAcknowledged() {
+        return acknowledged_;
+    }
+private:
+    bool acknowledged_;
+};
+
 class IndicesClient {
 public:
     IndicesClient(std::string url)
@@ -223,6 +236,11 @@ public:
     void get(
         std::string indexName,
         std::function<void (GetIndexResponsePtr &)> &&resultCallback,
+        std::function<void (ElasticSearchException &&)> &&exceptionCallback);
+    DeleteIndexResponsePtr deleteIndex(std::string indexName);
+    void deleteIndex(
+        std::string indexName,
+        std::function<void (DeleteIndexResponsePtr &)> &&resultCallback,
         std::function<void (ElasticSearchException &&)> &&exceptionCallback);
 private:
     std::string url_;
