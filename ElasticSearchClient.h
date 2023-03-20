@@ -22,12 +22,6 @@ namespace elasticsearch {
 
 class CreateIndexResponse;
 using CreateIndexResponsePtr = std::shared_ptr<CreateIndexResponse>;
-class CreateIndexSuccessResponse;
-using CreateIndexSuccessResponsePtr = std::shared_ptr<CreateIndexSuccessResponse>;
-class ResponseErrorData;
-using ResponseErrorDataPtr  = std::shared_ptr<ResponseErrorData>;
-class CreateIndexFailedResponse;
-using CreateIndexFailedResponsePtr = std::shared_ptr<CreateIndexFailedResponse>;
 class Property;
 using PropertyPtr = std::shared_ptr<Property>;
 class CreateIndexParam;
@@ -57,32 +51,8 @@ private:
 };
 
 class CreateIndexResponse {
-protected:
-    CreateIndexResponse(std::string className)
-    {}
 public:
-    virtual ~CreateIndexResponse() {}
-public:
-    virtual bool isSuccess() = 0;
-    virtual void setByJson(const std::shared_ptr<Json::Value>&) = 0;
-    virtual std::string className() {
-        return class_name_;
-    }
-    static CreateIndexResponsePtr makeResponseFromJson(const std::shared_ptr<Json::Value> &responseBody);
-private:
-    std::string class_name_;
-};
-
-class CreateIndexSuccessResponse : public CreateIndexResponse {
-public:
-    CreateIndexSuccessResponse()
-        : CreateIndexResponse("CreateIndexSuccessResponse")
-    {}
-public:
-    bool isSuccess() override {
-        return true;
-    }
-    virtual void setByJson(const std::shared_ptr<Json::Value>&) override;
+    void setByJson(const std::shared_ptr<Json::Value> &responseBody);
     bool isAcknowledged() {
         return acknowledged_;
     }
@@ -96,49 +66,6 @@ private:
     bool acknowledged_;
     bool shards_acknowledged_;
     std::string index_;
-};
-
-class ResponseErrorData {
-    friend class CreateIndexFailedResponse;
-public:
-    std::string getType() {
-        return type_;
-    }
-    std::string getReason() {
-        return reason_;
-    }
-    std::string getIndexUuid() {
-        return index_uuid_;
-    }
-    std::string getIndex() {
-        return index_;
-    }
-private:
-    std::string type_;
-    std::string reason_;
-    std::string index_uuid_;
-    std::string index_;
-};
-
-class CreateIndexFailedResponse : public CreateIndexResponse {
-public:
-    CreateIndexFailedResponse()
-        : CreateIndexResponse("CreateIndexFailedResponse")
-    {}
-public:
-    bool isSuccess() override {
-        return false;
-    }
-    virtual void setByJson(const std::shared_ptr<Json::Value>&) override;
-    ResponseErrorDataPtr getError() {
-        return error_;
-    }
-    int32_t getStatus() {
-        return status_;
-    }
-private:
-    ResponseErrorDataPtr error_;
-    int32_t status_;
 };
 
 enum PropertyType {

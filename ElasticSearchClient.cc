@@ -23,37 +23,10 @@ using namespace drogon;
 
 using namespace tl::elasticsearch;
 
-shared_ptr<CreateIndexResponse> CreateIndexResponse::makeResponseFromJson(const shared_ptr<Json::Value> &responseBody) {
-    CreateIndexResponsePtr response;
-    if (responseBody->isMember("error")) {
-        response = make_shared<CreateIndexFailedResponse>();
-    } else {
-        response = make_shared<CreateIndexSuccessResponse>();
-    }
-    response->setByJson(responseBody);
-    return response;
-}
-
-void CreateIndexSuccessResponse::setByJson(const std::shared_ptr<Json::Value> &response) {
+void CreateIndexResponse::setByJson(const std::shared_ptr<Json::Value> &response) {
     this->acknowledged_ = response->get("acknowledged", Json::Value(false)).asBool();
     this->shards_acknowledged_ = response->get("shards_acknowledged", Json::Value(false)).asBool();
     this->index_ = response->get("index", Json::Value("")).asString();
-}
-
-void CreateIndexFailedResponse::setByJson(const std::shared_ptr<Json::Value> &response) {
-    if (!response->isMember("error")) {
-        throw new Json::LogicError("missing required child node: ['error']");
-    }
-
-    auto error = make_shared<ResponseErrorData>();
-    auto errorNode = response->get("error", Json::Value());
-    error->type_ = errorNode.get("type", Json::Value("")).asString();
-    error->reason_ = errorNode.get("reason", Json::Value("")).asString();
-    error->index_uuid_ = errorNode.get("index_uuid", Json::Value("")).asString();
-    error->index_ = errorNode.get("index", Json::Value("")).asString();
-
-    this->error_ = error;
-    this->status_ = response->get("status", Json::Value(400)).asInt();
 }
 
 CreateIndexParam &CreateIndexParam::addProperty(Property* const property) {
@@ -193,37 +166,40 @@ void IndicesClient::create(
     req->setBody(param.toJsonString());
 
     auto client = HttpClient::newHttpClient(url_);
-    client->sendRequest(req, [this,resultCallback = move(resultCallback), exceptionCallback = move(exceptionCallback)](ReqResult result, const HttpResponsePtr &response) {
+    client->sendRequest(req, [
+        this,
+        resultCallback = move(resultCallback),
+        exceptionCallback = move(exceptionCallback)
+    ] (ReqResult result, const HttpResponsePtr &response) {
         if (result != ReqResult::Ok) {
-            LOG_ERROR << "error while sending request to server! url: [" << url_ << "], result: [" << result << "].";
-            string errorMessage;
+            string errorMessage = "failed error while sending request to server! url: [";
+            errorMessage += url_;
+            errorMessage += "], result: [";
+            errorMessage += to_string(result);
+            errorMessage += "].";
 
-            switch (result) {
-            case drogon::ReqResult::BadResponse:
-                errorMessage = "bad response";
-                break;
-            case drogon::ReqResult::NetworkFailure:
-                errorMessage = "network failure";
-                break;
-            case drogon::ReqResult::BadServerAddress:
-                errorMessage = "bad server address";
-                break;
-            case drogon::ReqResult::Timeout:
-                errorMessage = "timeout";
-                break;
-            case drogon::ReqResult::HandshakeError:
-                errorMessage = "handshake error";
-                break;
-            case drogon::ReqResult::InvalidCertificate:
-                errorMessage = "invalid certificate";
-                break;
-            }
+            LOG_WARN << errorMessage;
             exceptionCallback(ElasticSearchException(errorMessage));
-
         } else {
             auto responseBody = response->getJsonObject();
-            auto ci_result = CreateIndexResponse::makeResponseFromJson(response->getJsonObject());
-            resultCallback(ci_result);
+
+            LOG_TRACE << responseBody->toStyledString();
+
+            if (responseBody->isMember("error")) {
+                auto error = responseBody->get("error", {});
+                auto type = error.get("type", {}).asString();
+                auto reason = error.get("reason", {}).asString();
+                string errorMessage = "ElasticSearchException [type=";
+                errorMessage += type;
+                errorMessage += ", reason=";
+                errorMessage += reason;
+                errorMessage += "]";
+                exceptionCallback(ElasticSearchException(errorMessage));
+            } else {
+                CreateIndexResponsePtr ci_result = make_shared<CreateIndexResponse>();
+                ci_result->setByJson(responseBody);
+                resultCallback(ci_result);
+            }
         }
     });
 }
@@ -265,7 +241,14 @@ void IndicesClient::get(
         exceptionCallback = move(exceptionCallback)
     ] (ReqResult result, const HttpResponsePtr &response) {
         if (result != ReqResult::Ok) {
-            LOG_ERROR << "error while sending request to server! url: [" << url_ << "], result: [" << result << "].";
+            string errorMessage = "error while sending request to server! url: [";
+            errorMessage +=  url_;
+            errorMessage +=  "], result: [";
+            errorMessage +=  to_string(result);
+            errorMessage +=  "].";
+
+            LOG_WARN << errorMessage;
+            exceptionCallback(ElasticSearchException(errorMessage));
         } else {
             auto responseBody = response->getJsonObject();
 

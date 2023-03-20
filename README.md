@@ -51,17 +51,16 @@ CreateIndexParam param;
 param.addProperty(new Property("title", TEXT, "ik_smart"))
     .addProperty(new Property("content", TEXT, "ik_smart"))
     .addProperty(new Property("views", INTEGER));
-
-auto indices = esPlugin->indices();             // IndicesClientPtr
-auto response = indices->create("blog", param); // CreateIndexResponsePtr
-if (response->isSuccess()) {
+try {
+    auto indices = esPlugin->indices();             // IndicesClientPtr
+    auto response = indices->create("blog", param); // CreateIndexResponsePtr
     string result = "index created successfully, the name of index:<br>";
-    result += dynamic_pointer_cast<CreateIndexSuccessResponse>(response)->getIndex();
+    result += response->getIndex();
     LOG_INFO << result;
-} else {
+} catch (ElasticSearchException e) {
     string result = "failed to create index, the reason of failure:<br>";
-    result += dynamic_pointer_cast<CreateIndexFailedResponse>(response)->getError()->getReason();
-    LOG_INFO << result;
+    result += e.what();
+    LOG_ERROR << result;
 }
 ```
 
@@ -80,16 +79,12 @@ param.addProperty(new Property("title", TEXT, "ik_smart"))
 
 auto indices = esPlugin->indices();               // IndicesClientPtr
 indices->create("blog", [](CreateIndexResponsePtr &response) {
-    if (response->isSuccess()) {
-        string result = "index created successfully, the name of index:<br>";
-        result += dynamic_pointer_cast<CreateIndexSuccessResponse>(response)->getIndex();
-        LOG_INFO << result;
-    } else {
-        string result = "failed to create index, the reason of failure:<br>";
-        result += dynamic_pointer_cast<CreateIndexFailedResponse>(response)->getError()->getReason();
-        LOG_INFO << result;
-    }
+    string result = "index created successfully, the name of index:<br>";
+    result += response->getIndex();
+    LOG_INFO << result;
 }, [](ElasticSearchException &&exception) {
-    LOG_ERROR << exception.what();
+    string result = "failed to create index, the reason of failure:<br>";
+    result += exception.what();
+    LOG_ERROR << result;
 }, param);
 ```
