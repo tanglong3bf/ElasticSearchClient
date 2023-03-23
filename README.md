@@ -47,10 +47,13 @@ $ tree .
 // using namespace tl::elasticsearch;
 
 auto esPlugin = app().getPlugin<ElasticSearchClient>();
-CreateIndexParam param;
-param.addProperty(new Property("title", TEXT, "ik_smart"))
-    .addProperty(new Property("content", TEXT, "ik_smart"))
-    .addProperty(new Property("views", INTEGER));
+CreateIndexParam param(3, 2);
+param.addProperty(Property("title", TEXT, "ik_smart"))
+    .addProperty(Property("content", TEXT, "ik_smart"))
+    .addProperty(Property("views", INTEGER))
+    .addProperty(Property("author")
+        .addSubProperty(Property("firstName", KEYWORD))
+        .addSubProperty(Property("lastName", KEYWORD)));
 try {
     auto indices = esPlugin->indices();             // IndicesClientPtr
     auto response = indices->create("blog", param); // CreateIndexResponsePtr
@@ -72,10 +75,13 @@ try {
 // using namespace tl::elasticsearch;
 
 auto esPlugin = app().getPlugin<ElasticSearchClient>();
-CreateIndexParam param;
-param.addProperty(new Property("title", TEXT, "ik_smart"))
-    .addProperty(new Property("content", TEXT, "ik_smart"))
-    .addProperty(new Property("views", INTEGER));
+CreateIndexParam param(3, 2);
+param.addProperty(Property("title", TEXT, "ik_smart"))
+    .addProperty(Property("content", TEXT, "ik_smart"))
+    .addProperty(Property("views", INTEGER))
+    .addProperty(Property("author")
+        .addSubProperty(Property("firstName", KEYWORD))
+        .addSubProperty(Property("lastName", KEYWORD)));
 
 auto indices = esPlugin->indices();               // IndicesClientPtr
 indices->create("blog", [](CreateIndexResponsePtr &response) {

@@ -29,8 +29,8 @@ void CreateIndexResponse::setByJson(const std::shared_ptr<Json::Value> &response
     this->index_ = response->get("index", Json::Value("")).asString();
 }
 
-CreateIndexParam &CreateIndexParam::addProperty(Property* const property) {
-    this->properties_.push_back(PropertyPtr(property));
+CreateIndexParam &CreateIndexParam::addProperty(Property const &property) {
+    this->properties_.push_back(property);
     return *this;
 }
 
@@ -43,46 +43,25 @@ std::string CreateIndexParam::toJsonString() const {
 
     Json::Value properties;
     for (auto &item : properties_) {
-        Json::Value propertyValue;
-        string type;
-        switch (item->type_) {
-        case TEXT:
-            type = "TEXT";
-            break;
-        case KEYWORD:
-            type = "KEYWORD";
-            break;
-        case LONG:
-            type = "LONG";
-            break;
-        case INTEGER:
-            type = "INTEGER";
-            break;
-        case SHORT:
-            type = "SHORT";
-            break;
-        case BYTE:
-            type = "BYTE";
-            break;
-        case DOUBLE:
-            type = "DOUBLE";
-            break;
-        case FLOAT:
-            type = "FLOAT";
-            break;
-        case BOOLEAN:
-            type = "BOOLEAN";
-            break;
-        case DATE:
-            type = "DATE";
-            break;
+        if (item.type_ != NONE) {
+            Json::Value propertyValue;
+            propertyValue["type"] = to_string(item.type_);
+            if (item.type_ == TEXT) {
+                propertyValue["analyzer"] = item.analyzer_;
+            }
+            properties[item.property_name_] = propertyValue;
+        } else {
+            Json::Value subProperties;
+            for (auto &sub_item : item.properties_) {
+                Json::Value subProperty;
+                subProperty["type"] = to_string(sub_item.type_);
+                if (sub_item.type_ == TEXT) {
+                    subProperty["analyzer"] = sub_item.analyzer_;
+                }
+                subProperties[sub_item.property_name_] = subProperty;
+            }
+            properties[item.property_name_]["properties"] = subProperties;
         }
-
-        propertyValue["type"] = type;
-        if (item->type_ == TEXT) {
-            propertyValue["analyzer"] = item->analyzer_;
-        }
-        properties[item->property_name_] = propertyValue;
     }
 
     Json::Value _doc;
@@ -355,7 +334,7 @@ void ElasticSearchClient::initAndStart(const Json::Value &config) {
     url += this->host_;
     if (this->port_ != 80) {
         url += ":";
-        url += to_string(this->port_);
+        url += std::to_string(this->port_);
     }
     LOG_TRACE << url;
 
