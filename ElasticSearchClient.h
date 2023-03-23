@@ -155,27 +155,37 @@ inline PropertyType string2PropertyType(const std::string &str) {
 class Property {
     friend class CreateIndexParam;
 public:
-    Property(std::string property_name)
-        : property_name_(property_name),
-        type_(NONE)
-    {}
-    Property(std::string property_name,
-        PropertyType type
+    Property(
+        std::string property_name,
+        bool index = true
     )
         : property_name_(property_name),
-        type_(type)
+        type_(NONE),
+        index_(index)
+    {}
+    Property(
+        std::string property_name,
+        PropertyType type,
+        bool index = true
+    )
+        : property_name_(property_name),
+        type_(type),
+        index_(index)
     {
         if (type == TEXT) {
             analyzer_ = "standard";
         }
     }
-    Property(std::string property_name,
+    Property(
+        std::string property_name,
         PropertyType type,
-        std::string analyzer
+        std::string analyzer,
+        bool index = true
     )
         : property_name_(property_name),
         type_(type),
-        analyzer_(analyzer)
+        analyzer_(analyzer),
+        index_(index)
     {
         if (type != TEXT) {
             LOG_WARN << "type of " << to_string(type) << " not need analyzer but set.";
@@ -198,20 +208,28 @@ public:
     PropertyType getType() {
         return type_;
     }
+    bool getIndex() {
+        return index_;
+    }
     std::string getAnalyzer() {
         return analyzer_;
+    }
+    std::vector<Property> getProperties() {
+        return properties_;
     }
 private:
     std::string property_name_;
     PropertyType type_ = NONE;
-    bool index_ = false;
+    bool index_;
     std::string analyzer_;
     std::vector<Property> properties_;
 };
 
 class CreateIndexParam {
 public:
-    CreateIndexParam(int32_t numberOfShards = 5, int32_t numberOfReplicas = 1)
+    CreateIndexParam(
+        int32_t numberOfShards = 5,
+        int32_t numberOfReplicas = 1)
         : number_of_shards_(numberOfShards),
         number_of_replicas_(numberOfReplicas)
     {}
@@ -288,7 +306,9 @@ public:
     {}
     ~IndicesClient() {}
 public:
-    CreateIndexResponsePtr create(std::string indexName, const CreateIndexParam &param = CreateIndexParam());
+    CreateIndexResponsePtr create(
+        std::string indexName,
+        const CreateIndexParam &param = CreateIndexParam());
     void create(
         std::string indexName,
         std::function<void (CreateIndexResponsePtr &)> &&resultCallback,

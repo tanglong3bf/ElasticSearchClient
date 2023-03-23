@@ -46,6 +46,9 @@ std::string CreateIndexParam::toJsonString() const {
         if (item.type_ != NONE) {
             Json::Value propertyValue;
             propertyValue["type"] = to_string(item.type_);
+            if (!item.index_) {
+                propertyValue["index"] = false;
+            }
             if (item.type_ == TEXT) {
                 propertyValue["analyzer"] = item.analyzer_;
             }
@@ -55,6 +58,9 @@ std::string CreateIndexParam::toJsonString() const {
             for (auto &sub_item : item.properties_) {
                 Json::Value subProperty;
                 subProperty["type"] = to_string(sub_item.type_);
+                if (!sub_item.index_) {
+                    subProperty["index"] = false;
+                }
                 if (sub_item.type_ == TEXT) {
                     subProperty["analyzer"] = sub_item.analyzer_;
                 }
