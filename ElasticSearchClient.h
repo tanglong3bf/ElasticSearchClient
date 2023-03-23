@@ -11,15 +11,14 @@
 #include <drogon/HttpTypes.h>
 #include <drogon/plugins/Plugin.h>
 #include <exception>
+#include <functional>
 #include <json/value.h>
 #include <memory>
 #include <regex>
 #include <trantor/utils/Date.h>
 #include <trantor/utils/Logger.h>
-#include <unordered_map>
 
-namespace tl {
-namespace elasticsearch {
+namespace tl::elasticsearch {
 
 class CreateIndexResponse;
 using CreateIndexResponsePtr = std::shared_ptr<CreateIndexResponse>;
@@ -31,6 +30,10 @@ class Settings;
 using SettingsPtr = std::shared_ptr<Settings>;
 class GetIndexResponse;
 using GetIndexResponsePtr = std::shared_ptr<GetIndexResponse>;
+class PutMappingResponse;
+using PutMappingResponsePtr = std::shared_ptr<PutMappingResponse>;
+class PutMappingParam;
+using PutMappingParamPtr = std::shared_ptr<PutMappingParam>;
 class DeleteIndexResponse;
 using DeleteIndexResponsePtr = std::shared_ptr<DeleteIndexResponse>;
 class IndicesClient;
@@ -72,6 +75,7 @@ private:
 };
 
 enum PropertyType {
+    NONE,
     TEXT,
     KEYWORD,
     LONG,
@@ -84,37 +88,70 @@ enum PropertyType {
     DATE,
 };
 
-inline PropertyType string2PropertyType(std::string &str) {
+inline std::string to_string(const PropertyType &propertyType) {
+    if (propertyType == NONE) {
+        return "none";
+    }
+    if (propertyType == TEXT) {
+        return "text";
+    }
+    if (propertyType == KEYWORD) {
+        return "keyword";
+    }
+    if (propertyType == LONG) {
+        return "long";
+    }
+    if (propertyType == INTEGER) {
+        return "integer";
+    }
+    if (propertyType == SHORT) {
+        return "short";
+    }
+    if (propertyType == BYTE) {
+        return "byte";
+    }
+    if (propertyType == DOUBLE) {
+        return "double";
+    }
+    if (propertyType == FLOAT) {
+        return "float";
+    }
+    if (propertyType == BOOLEAN) {
+        return "boolean";
+    }
+    if (propertyType == DATE) {
+        return "date";
+    }
+}
+
+inline PropertyType string2PropertyType(const std::string &str) {
     PropertyType result;
-    if (str == "TEXT") {
+    if (str == "text") {
         result = TEXT;
-    }
-    if (str == "KEYWORD") {
+    } else if (str == "keyword") {
         result = KEYWORD;
-    }
-    if (str == "LONG") {
+    } else if (str == "long") {
         result = LONG;
-    }
-    if (str == "INTEGER") {
+    } else if (str == "integer") {
         result = INTEGER;
-    }
-    if (str == "SHORT") {
+    } else if (str == "short") {
         result = SHORT;
-    }
-    if (str == "BYTE") {
+    } else if (str == "byte") {
         result = BYTE;
-    }
-    if (str == "DOUBLE") {
+    } else if (str == "double") {
         result = DOUBLE;
-    }
-    if (str == "FLOAT") {
+    } else if (str == "float") {
         result = FLOAT;
-    }
-    if (str == "BOOLEAN") {
+    } else if (str == "boolean") {
         result = BOOLEAN;
-    }
-    if (str == "DATE") {
+    } else if (str == "date") {
         result = DATE;
+    } else if (str == "none") {
+        result = NONE;
+    } else {
+        std::string error_message = "error property type: ";
+        error_message += str;
+        throw tl::elasticsearch::ElasticSearchException(error_message);
     }
     return result;
 }
@@ -122,42 +159,90 @@ inline PropertyType string2PropertyType(std::string &str) {
 class Property {
     friend class CreateIndexParam;
 public:
-    Property(std::string property_name,
+    Property(
+        std::string property_name,
+        bool index = false
+    )
+        : property_name_(property_name),
+        type_(NONE),
+        index_(index)
+    {}
+    Property(
+        std::string property_name,
         PropertyType type,
-        std::string analyzer = "standard"
+        bool index = true
     )
         : property_name_(property_name),
         type_(type),
-        analyzer_(analyzer)
-    {}
+        index_(index)
+    {
+        if (type == TEXT) {
+            analyzer_ = "standard";
+        }
+    }
+    Property(
+        std::string property_name,
+        PropertyType type,
+        std::string analyzer,
+        bool index = true
+    )
+        : property_name_(property_name),
+        type_(type),
+        analyzer_(analyzer),
+        index_(index)
+    {
+        if (type != TEXT) {
+            LOG_WARN << "type of " << to_string(type) << " not need analyzer but set.";
+        }
+    }
+    Property &addSubProperty(Property subProperty) {
+        if (type_ != NONE) {
+            std::string error_message = "Property of ";
+            error_message += to_string(type_);
+            error_message += " CANNOT have children.";
+            throw tl::elasticsearch::ElasticSearchException(error_message);
+        }
+        properties_.push_back(subProperty);
+        return *this;
+    }
 public:
-    std::string getPropertyName() {
+    std::string getPropertyName() const {
         return property_name_;
     }
-    PropertyType getType() {
+    PropertyType getType() const {
         return type_;
     }
-    std::string getAnalyzer() {
+    bool getIndex() const {
+        return index_;
+    }
+    std::string getAnalyzer() const {
         return analyzer_;
+    }
+    std::vector<Property> getProperties() const {
+        return properties_;
     }
 private:
     std::string property_name_;
-    PropertyType type_;
+    PropertyType type_ = NONE;
+    bool index_;
     std::string analyzer_;
+    std::vector<Property> properties_;
 };
 
 class CreateIndexParam {
 public:
-    CreateIndexParam(int32_t numberOfShards = 5, int32_t numberOfReplicas = 1)
+    CreateIndexParam(
+        int32_t numberOfShards = 5,
+        int32_t numberOfReplicas = 1)
         : number_of_shards_(numberOfShards),
         number_of_replicas_(numberOfReplicas)
     {}
-    CreateIndexParam &addProperty(Property* const property);
+    CreateIndexParam &addProperty(Property const &property);
     std::string toJsonString() const;
 private:
     int32_t number_of_shards_;
     int32_t number_of_replicas_;
-    std::vector<PropertyPtr> properties_;
+    std::vector<Property> properties_;
 };
 
 class Settings {
@@ -193,7 +278,7 @@ private:
 class GetIndexResponse {
 public:
     void setByJson(const std::shared_ptr<Json::Value>&responseBody);
-    std::vector<PropertyPtr> getProperties() {
+    std::vector<Property> getProperties() {
         return properties_;
     }
     std::vector<std::string> getAliases() {
@@ -203,9 +288,27 @@ public:
         return settings_;
     }
 private:
-    std::vector<PropertyPtr> properties_;
+    std::vector<Property> properties_;
     std::vector<std::string> aliases_;
     SettingsPtr settings_;
+};
+
+class PutMappingResponse {
+public:
+    void setByJson(const std::shared_ptr<Json::Value>&responseBody);
+    bool isAcknowledged() {
+        return acknowledged_;
+    }
+private:
+    bool acknowledged_;
+};
+
+class PutMappingParam {
+public:
+    PutMappingParam &addProperty(Property const &property);
+    std::string toJsonString() const;
+private:
+    std::vector<Property> properties_;
 };
 
 class DeleteIndexResponse {
@@ -225,7 +328,9 @@ public:
     {}
     ~IndicesClient() {}
 public:
-    CreateIndexResponsePtr create(std::string indexName, const CreateIndexParam &param = CreateIndexParam());
+    CreateIndexResponsePtr create(
+        std::string indexName,
+        const CreateIndexParam &param = CreateIndexParam());
     void create(
         std::string indexName,
         std::function<void (CreateIndexResponsePtr &)> &&resultCallback,
@@ -237,6 +342,16 @@ public:
         std::string indexName,
         std::function<void (GetIndexResponsePtr &)> &&resultCallback,
         std::function<void (ElasticSearchException &&)> &&exceptionCallback);
+
+    PutMappingResponsePtr putMapping(
+        std::string indexName,
+        const PutMappingParam &param);
+    void putMapping(
+        std::string indexName,
+        std::function<void (PutMappingResponsePtr &)> &&resultCallback,
+        std::function<void (ElasticSearchException &&)> &&exceptionCallback,
+        const PutMappingParam &param);
+
     DeleteIndexResponsePtr deleteIndex(std::string indexName);
     void deleteIndex(
         std::string indexName,
@@ -266,4 +381,3 @@ private:
 };
 
 }; // namespace: tl::elasticsearch
-}; // namespace: tl
