@@ -138,6 +138,51 @@ void GetIndexResponse::setByJson(const std::shared_ptr<Json::Value> &responseBod
     this->settings_->setByJson(make_shared<Json::Value>(settings));
 }
 
+void PutMappingResponse::setByJson(const std::shared_ptr<Json::Value> &response) {
+    this->acknowledged_ = response->get("acknowledged", false).asBool();
+}
+
+PutMappingParam &PutMappingParam::addProperty(Property const &property) {
+    this->properties_.push_back(property);
+    return *this;
+}
+
+std::string PutMappingParam::toJsonString() const {
+    Json::Value properties;
+    for (auto &item : properties_) {
+        if (item.getType() != NONE) {
+            Json::Value propertyValue;
+            propertyValue["type"] = to_string(item.getType());
+            if (!item.getIndex()) {
+                propertyValue["index"] = false;
+            }
+            if (item.getType() == TEXT) {
+                propertyValue["analyzer"] = item.getAnalyzer();
+            }
+            properties[item.getPropertyName()] = propertyValue;
+        } else {
+            Json::Value subProperties;
+            for (auto &sub_item : item.getProperties()) {
+                Json::Value subProperty;
+                subProperty["type"] = to_string(sub_item.getType());
+                if (!sub_item.getIndex()) {
+                    subProperty["index"] = false;
+                }
+                if (sub_item.getType() == TEXT) {
+                    subProperty["analyzer"] = sub_item.getAnalyzer();
+                }
+                subProperties[sub_item.getPropertyName()] = subProperty;
+            }
+            properties[item.getPropertyName()]["properties"] = subProperties;
+        }
+    }
+
+    Json::Value result;
+    result["properties"] = properties;
+
+    return result.toStyledString();
+}
+
 void DeleteIndexResponse::setByJson(const std::shared_ptr<Json::Value> &response) {
     this->acknowledged_ = response->get("acknowledged", false).asBool();
 }
@@ -274,6 +319,81 @@ void IndicesClient::get(
             } else {
                 GetIndexResponsePtr response = std::make_shared<GetIndexResponse>();
                 response->setByJson(std::make_shared<Json::Value>(responseBody->get(indexName, {})));
+                resultCallback(response);
+            }
+        }
+    });
+}
+
+PutMappingResponsePtr IndicesClient::putMapping(
+    std::string indexName,
+    const PutMappingParam &param) {
+    shared_ptr<promise<PutMappingResponsePtr>> pro(new promise<PutMappingResponsePtr>);
+    auto f = pro->get_future();
+    this->putMapping(indexName, [&pro](PutMappingResponsePtr &response) {
+        try {
+            pro->set_value(response);
+        }
+        catch (...) {
+            pro->set_exception(std::current_exception());
+        }
+    }, [&pro](ElasticSearchException &&err){
+        pro->set_exception(std::make_exception_ptr(err));
+    }, param);
+    return f.get();
+}
+
+void IndicesClient::putMapping(
+    std::string indexName,
+    std::function<void (PutMappingResponsePtr &)> &&resultCallback,
+    std::function<void (ElasticSearchException &&)> &&exceptionCallback,
+    const PutMappingParam &param) {
+
+    string path("/");
+    path += indexName;
+    path += "/_mapping/_doc";
+
+    auto req = HttpRequest::newHttpRequest();
+    req->setMethod(Put);
+    req->setPath(path);
+    req->setContentTypeCode(CT_APPLICATION_JSON);
+    req->setBody(param.toJsonString());
+
+    auto client = HttpClient::newHttpClient(url_);
+    client->sendRequest(req, [
+        this,
+        &indexName,
+        &param,
+        resultCallback = move(resultCallback),
+        exceptionCallback = move(exceptionCallback)
+    ] (ReqResult result, const HttpResponsePtr &response) {
+        if (result != ReqResult::Ok) {
+            string errorMessage = "error while sending request to server! url: [";
+            errorMessage +=  url_;
+            errorMessage +=  "], result: [";
+            errorMessage +=  to_string(result);
+            errorMessage +=  "].";
+
+            LOG_WARN << errorMessage;
+            exceptionCallback(ElasticSearchException(errorMessage));
+        } else {
+            auto responseBody = response->getJsonObject();
+
+            LOG_TRACE << responseBody->toStyledString();
+
+            if (responseBody->isMember("error")) {
+                auto error = responseBody->get("error", {});
+                auto type = error.get("type", {}).asString();
+                auto reason = error.get("reason", {}).asString();
+                string errorMessage = "ElasticSearchException [type=";
+                errorMessage += type;
+                errorMessage += ", reason=";
+                errorMessage += reason;
+                errorMessage += "]";
+                exceptionCallback(ElasticSearchException(errorMessage));
+            } else {
+                PutMappingResponsePtr response = std::make_shared<PutMappingResponse>();
+                response->setByJson(responseBody);
                 resultCallback(response);
             }
         }

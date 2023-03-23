@@ -30,6 +30,10 @@ class Settings;
 using SettingsPtr = std::shared_ptr<Settings>;
 class GetIndexResponse;
 using GetIndexResponsePtr = std::shared_ptr<GetIndexResponse>;
+class PutMappingResponse;
+using PutMappingResponsePtr = std::shared_ptr<PutMappingResponse>;
+class PutMappingParam;
+using PutMappingParamPtr = std::shared_ptr<PutMappingParam>;
 class DeleteIndexResponse;
 using DeleteIndexResponsePtr = std::shared_ptr<DeleteIndexResponse>;
 class IndicesClient;
@@ -202,19 +206,19 @@ public:
         return *this;
     }
 public:
-    std::string getPropertyName() {
+    std::string getPropertyName() const {
         return property_name_;
     }
-    PropertyType getType() {
+    PropertyType getType() const {
         return type_;
     }
-    bool getIndex() {
+    bool getIndex() const {
         return index_;
     }
-    std::string getAnalyzer() {
+    std::string getAnalyzer() const {
         return analyzer_;
     }
-    std::vector<Property> getProperties() {
+    std::vector<Property> getProperties() const {
         return properties_;
     }
 private:
@@ -289,6 +293,24 @@ private:
     SettingsPtr settings_;
 };
 
+class PutMappingResponse {
+public:
+    void setByJson(const std::shared_ptr<Json::Value>&responseBody);
+    bool isAcknowledged() {
+        return acknowledged_;
+    }
+private:
+    bool acknowledged_;
+};
+
+class PutMappingParam {
+public:
+    PutMappingParam &addProperty(Property const &property);
+    std::string toJsonString() const;
+private:
+    std::vector<Property> properties_;
+};
+
 class DeleteIndexResponse {
 public:
     void setByJson(const std::shared_ptr<Json::Value>&responseBody);
@@ -320,6 +342,16 @@ public:
         std::string indexName,
         std::function<void (GetIndexResponsePtr &)> &&resultCallback,
         std::function<void (ElasticSearchException &&)> &&exceptionCallback);
+
+    PutMappingResponsePtr putMapping(
+        std::string indexName,
+        const PutMappingParam &param);
+    void putMapping(
+        std::string indexName,
+        std::function<void (PutMappingResponsePtr &)> &&resultCallback,
+        std::function<void (ElasticSearchException &&)> &&exceptionCallback,
+        const PutMappingParam &param);
+
     DeleteIndexResponsePtr deleteIndex(std::string indexName);
     void deleteIndex(
         std::string indexName,
