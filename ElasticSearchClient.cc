@@ -108,11 +108,29 @@ void GetIndexResponse::setByJson(const std::shared_ptr<Json::Value> &responseBod
     for (auto &name : propertiesNames) {
         auto propertyNode = properties.get(name, {});
 
-        auto type = propertyNode.get("type", {}).asString();
-        PropertyType propertyType = string2PropertyType(type);
+        if (propertyNode.isMember("properties")) {
+            auto subProperties = propertyNode.get("properties", {});
+            auto subPropertiesNames = subProperties.getMemberNames();
+            Property property(name);
+            for (auto &subName : subPropertiesNames) {
+                auto subPropertyNode = subProperties.get(name, {});
+                auto type = subPropertyNode.get("type", "none").asString();
+                PropertyType propertyType = string2PropertyType(type);
 
-        auto analyzer = propertyNode.get("analyzer", {}).asString();
-        this->properties_.push_back(make_shared<Property>(name, propertyType, analyzer));
+                auto index = subPropertyNode.get("index", true).asBool();
+                auto analyzer = subPropertyNode.get("analyzer", "").asString();
+                Property subProperty(subName, propertyType, analyzer, index);
+                property.addSubProperty(subProperty);
+            }
+            this->properties_.push_back(property);
+        } else {
+            auto type = propertyNode.get("type", "none").asString();
+            PropertyType propertyType = string2PropertyType(type);
+
+            auto index = propertyNode.get("index", true).asBool();
+            auto analyzer = propertyNode.get("analyzer", "").asString();
+            this->properties_.push_back(Property(name, propertyType, analyzer, index));
+        }
     }
 
     this->settings_ = make_shared<Settings>();

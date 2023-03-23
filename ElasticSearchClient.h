@@ -122,27 +122,27 @@ inline std::string to_string(const PropertyType &propertyType) {
 
 inline PropertyType string2PropertyType(const std::string &str) {
     PropertyType result;
-    if (str == "TEXT") {
+    if (str == "text") {
         result = TEXT;
-    } else if (str == "KEYWORD") {
+    } else if (str == "keyword") {
         result = KEYWORD;
-    } else if (str == "LONG") {
+    } else if (str == "long") {
         result = LONG;
-    } else if (str == "INTEGER") {
+    } else if (str == "integer") {
         result = INTEGER;
-    } else if (str == "SHORT") {
+    } else if (str == "short") {
         result = SHORT;
-    } else if (str == "BYTE") {
+    } else if (str == "byte") {
         result = BYTE;
-    } else if (str == "DOUBLE") {
+    } else if (str == "double") {
         result = DOUBLE;
-    } else if (str == "FLOAT") {
+    } else if (str == "float") {
         result = FLOAT;
-    } else if (str == "BOOLEAN") {
+    } else if (str == "boolean") {
         result = BOOLEAN;
-    } else if (str == "DATE") {
+    } else if (str == "date") {
         result = DATE;
-    } else if (str == "NONE") {
+    } else if (str == "none") {
         result = NONE;
     } else {
         std::string error_message = "error property type: ";
@@ -157,7 +157,7 @@ class Property {
 public:
     Property(
         std::string property_name,
-        bool index = true
+        bool index = false
     )
         : property_name_(property_name),
         type_(NONE),
@@ -274,7 +274,7 @@ private:
 class GetIndexResponse {
 public:
     void setByJson(const std::shared_ptr<Json::Value>&responseBody);
-    std::vector<PropertyPtr> getProperties() {
+    std::vector<Property> getProperties() {
         return properties_;
     }
     std::vector<std::string> getAliases() {
@@ -284,7 +284,7 @@ public:
         return settings_;
     }
 private:
-    std::vector<PropertyPtr> properties_;
+    std::vector<Property> properties_;
     std::vector<std::string> aliases_;
     SettingsPtr settings_;
 };
