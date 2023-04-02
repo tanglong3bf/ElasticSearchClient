@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <drogon/HttpClient.h>
 #include <drogon/HttpTypes.h>
 #include <drogon/plugins/Plugin.h>
 #include <exception>
@@ -15,11 +16,13 @@
 #include <json/value.h>
 #include <memory>
 #include <regex>
+#include <stdexcept>
 #include <trantor/utils/Date.h>
 #include <trantor/utils/Logger.h>
 
 namespace tl::elasticsearch {
 
+class ElasticSearchException;
 class CreateIndexResponse;
 using CreateIndexResponsePtr = std::shared_ptr<CreateIndexResponse>;
 class Property;
@@ -39,6 +42,29 @@ using DeleteIndexResponsePtr = std::shared_ptr<DeleteIndexResponse>;
 class IndicesClient;
 using IndicesClientPtr = std::shared_ptr<IndicesClient>;
 
+class ElasticSearchHttpClient {
+public:
+    ElasticSearchHttpClient(std::string url)
+        : url_(url)
+    {
+        LOG_DEBUG << url;
+        LOG_DEBUG << url_;
+    }
+public:
+    Json::Value sendRequest(
+        const std::string &path,
+        drogon::HttpMethod method,
+        const Json::Value &requestBody = {});
+
+    void sendRequest(const std::string &path,
+        drogon::HttpMethod method,
+        const std::function<void (Json::Value &)> &&resultCallback,
+        const std::function<void (ElasticSearchException &&)> &&exceptionCallback,
+        const Json::Value &requestBody = {});
+private:
+    std::string url_;
+};
+
 class ElasticSearchException : public std::exception {
 public:
     const char *what() const noexcept override
@@ -48,7 +74,7 @@ public:
     ElasticSearchException(const std::string &message)
         : message_(message)
     {}
-    ElasticSearchException(std::string &&message)
+    ElasticSearchException(std::string &message)
         : message_(std::move(message))
     {}
     ElasticSearchException() = delete;
@@ -58,14 +84,14 @@ private:
 
 class CreateIndexResponse {
 public:
-    void setByJson(const std::shared_ptr<Json::Value> &responseBody);
+    void setByJson(const Json::Value &responseBody);
     bool isAcknowledged() {
         return acknowledged_;
     }
     bool isShardsAcknowledged() {
         return shards_acknowledged_;
     }
-    std::string getIndex() {
+    const std::string &getIndex() {
         return index_;
     }
 private:
@@ -122,6 +148,7 @@ inline std::string to_string(const PropertyType &propertyType) {
     if (propertyType == DATE) {
         return "date";
     }
+    throw std::runtime_error("unkown type");
 }
 
 inline PropertyType string2PropertyType(const std::string &str) {
@@ -153,14 +180,14 @@ inline PropertyType string2PropertyType(const std::string &str) {
         error_message += str;
         throw tl::elasticsearch::ElasticSearchException(error_message);
     }
-    return result;
+    return std::move(result);
 }
 
 class Property {
-    friend class CreateIndexParam;
+    // friend class CreateIndexParam;
 public:
     Property(
-        std::string property_name,
+        const std::string &property_name,
         bool index = false
     )
         : property_name_(property_name),
@@ -168,7 +195,7 @@ public:
         index_(index)
     {}
     Property(
-        std::string property_name,
+        const std::string &property_name,
         PropertyType type,
         bool index = true
     )
@@ -181,9 +208,9 @@ public:
         }
     }
     Property(
-        std::string property_name,
+        const std::string &property_name,
         PropertyType type,
-        std::string analyzer,
+        const std::string &analyzer,
         bool index = true
     )
         : property_name_(property_name),
@@ -195,7 +222,7 @@ public:
             LOG_WARN << "type of " << to_string(type) << " not need analyzer but set.";
         }
     }
-    Property &addSubProperty(Property subProperty) {
+    Property &addSubProperty(const Property &subProperty) {
         if (type_ != NONE) {
             std::string error_message = "Property of ";
             error_message += to_string(type_);
@@ -206,19 +233,19 @@ public:
         return *this;
     }
 public:
-    std::string getPropertyName() const {
+    const std::string &getPropertyName() const {
         return property_name_;
     }
-    PropertyType getType() const {
+    const PropertyType &getType() const {
         return type_;
     }
     bool getIndex() const {
         return index_;
     }
-    std::string getAnalyzer() const {
+    const std::string &getAnalyzer() const {
         return analyzer_;
     }
-    std::vector<Property> getProperties() const {
+    const std::vector<Property> &getProperties() const {
         return properties_;
     }
 private:
@@ -237,7 +264,8 @@ public:
         : number_of_shards_(numberOfShards),
         number_of_replicas_(numberOfReplicas)
     {}
-    CreateIndexParam &addProperty(Property const &property);
+    CreateIndexParam &addProperty(const Property &property);
+    Json::Value toJson() const;
     std::string toJsonString() const;
 private:
     int32_t number_of_shards_;
@@ -247,23 +275,23 @@ private:
 
 class Settings {
 public:
-    void setByJson(const std::shared_ptr<Json::Value> &json);
-    trantor::Date getCreationDate() {
+    void setByJson(const Json::Value &json);
+    const trantor::Date &getCreationDate() const {
         return creation_date_;
     }
-    int32_t getNumberOfShards() {
+    int32_t getNumberOfShards() const {
         return number_of_shards_;
     }
-    int32_t getNumberOfReplicas() {
+    int32_t getNumberOfReplicas() const {
         return number_of_replicas_;
     }
-    std::string getUuid() {
+    const std::string &getUuid() const {
         return uuid_;
     }
-    std::string getVersionCreated() {
+    const std::string &getVersionCreated() const {
         return version_created_;
     }
-    std::string getProvidedName() {
+    const std::string &getProvidedName() const {
         return provided_name_;
     }
 private:
@@ -277,14 +305,14 @@ private:
 
 class GetIndexResponse {
 public:
-    void setByJson(const std::shared_ptr<Json::Value>&responseBody);
-    std::vector<Property> getProperties() {
+    void setByJson(const Json::Value &responseBody);
+    const std::vector<Property> &getProperties() const {
         return properties_;
     }
-    std::vector<std::string> getAliases() {
+    const std::vector<std::string> &getAliases() const {
         return aliases_;
     }
-    SettingsPtr getSettings() {
+    const SettingsPtr &getSettings() const {
         return settings_;
     }
 private:
@@ -295,8 +323,8 @@ private:
 
 class PutMappingResponse {
 public:
-    void setByJson(const std::shared_ptr<Json::Value>&responseBody);
-    bool isAcknowledged() {
+    void setByJson(const Json::Value &responseBody);
+    bool isAcknowledged() const {
         return acknowledged_;
     }
 private:
@@ -305,16 +333,17 @@ private:
 
 class PutMappingParam {
 public:
-    PutMappingParam &addProperty(Property const &property);
-    std::string toJsonString() const;
+    PutMappingParam &addProperty(const Property &property);
+    const Json::Value toJson() const;
+    const std::string toJsonString() const;
 private:
     std::vector<Property> properties_;
 };
 
 class DeleteIndexResponse {
 public:
-    void setByJson(const std::shared_ptr<Json::Value>&responseBody);
-    bool isAcknowledged() {
+    void setByJson(const Json::Value &responseBody);
+    bool isAcknowledged() const {
         return acknowledged_;
     }
 private:
@@ -323,42 +352,42 @@ private:
 
 class IndicesClient {
 public:
-    IndicesClient(std::string url)
-        : url_(url)
+    IndicesClient(std::shared_ptr<ElasticSearchHttpClient> httpClient)
+        : httpClient_(httpClient)
     {}
     ~IndicesClient() {}
 public:
     CreateIndexResponsePtr create(
-        std::string indexName,
-        const CreateIndexParam &param = CreateIndexParam());
+        const std::string &indexName,
+        const CreateIndexParam &param = CreateIndexParam()) const;
     void create(
-        std::string indexName,
-        std::function<void (CreateIndexResponsePtr &)> &&resultCallback,
-        std::function<void (ElasticSearchException &&)> &&exceptionCallback,
-        const CreateIndexParam &param = CreateIndexParam());
+        const std::string &indexName,
+        const std::function<void (CreateIndexResponsePtr &)> &&resultCallback,
+        const std::function<void (ElasticSearchException &&)> &&exceptionCallback,
+        const CreateIndexParam &param = CreateIndexParam()) const;
 
-    GetIndexResponsePtr get(std::string indexName);
+    GetIndexResponsePtr get(const std::string &indexName) const;
     void get(
-        std::string indexName,
-        std::function<void (GetIndexResponsePtr &)> &&resultCallback,
-        std::function<void (ElasticSearchException &&)> &&exceptionCallback);
+        const std::string &indexName,
+        const std::function<void (GetIndexResponsePtr &)> &&resultCallback,
+        const std::function<void (ElasticSearchException &&)> &&exceptionCallback) const;
 
     PutMappingResponsePtr putMapping(
-        std::string indexName,
-        const PutMappingParam &param);
+        const std::string &indexName,
+        const PutMappingParam &param) const;
     void putMapping(
-        std::string indexName,
-        std::function<void (PutMappingResponsePtr &)> &&resultCallback,
-        std::function<void (ElasticSearchException &&)> &&exceptionCallback,
-        const PutMappingParam &param);
+        const std::string &indexName,
+        const std::function<void (PutMappingResponsePtr &)> &&resultCallback,
+        const std::function<void (ElasticSearchException &&)> &&exceptionCallback,
+        const PutMappingParam &param) const;
 
-    DeleteIndexResponsePtr deleteIndex(std::string indexName);
+    DeleteIndexResponsePtr deleteIndex(const std::string &indexName) const;
     void deleteIndex(
-        std::string indexName,
-        std::function<void (DeleteIndexResponsePtr &)> &&resultCallback,
-        std::function<void (ElasticSearchException &&)> &&exceptionCallback);
+        const std::string &indexName,
+        const std::function<void (DeleteIndexResponsePtr &)> &&resultCallback,
+        const std::function<void (ElasticSearchException &&)> &&exceptionCallback) const;
 private:
-    std::string url_;
+    std::shared_ptr<ElasticSearchHttpClient> httpClient_;
 };
 
 class ElasticSearchClient : public drogon::Plugin<ElasticSearchClient>
@@ -372,9 +401,11 @@ public:
     /// It must be implemented by the user.
     void shutdown() override;
 public:
-    IndicesClientPtr indices();
+    IndicesClientPtr indices() const;
+    std::shared_ptr<ElasticSearchHttpClient> httpClient() const;
 private:
     IndicesClientPtr indices_;
+    std::shared_ptr<ElasticSearchHttpClient> httpClient_;
 private:
     std::string host_;
     int16_t port_;
