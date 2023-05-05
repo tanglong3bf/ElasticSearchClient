@@ -56,12 +56,13 @@ Json::Value CreateIndexParam::toJson() const {
         }
     }
 
-    Json::Value _doc;
-    _doc["properties"] = properties;
-
-    Json::Value mappings;
-    mappings["_doc"] = _doc;
-    result["mappings"] = mappings;
+    if (!properties.empty()) {
+        Json::Value mappings;
+        Json::Value _doc;
+        _doc["properties"] = properties;
+        mappings["_doc"] = _doc;
+        result["mappings"] = mappings;
+    }
 
     return move(result);
 }
