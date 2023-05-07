@@ -6,7 +6,7 @@ ElasticSearchClient is a [Drogon](https://github.com/drogonframework/drogon.git)
 
 ## Install
 
-For the default drogon project, you only need to copy two files to the `plugins` directory of the project to use them.
+For the default drogon project, you need create a new subdirectory in the `plugins` directory of the project.
 
 Like this:
 
@@ -17,8 +17,31 @@ $ tree .
 ├── config.json
 ├── main.cc
 └── plugins
-    ├── ElasticSearchClient.cc
-    └── ElasticSearchClient.h
+    └── tl_elasticsearch
+```
+
+And then, copy all files in the `src` directory to the new subdirectory.
+
+Like this:
+
+```shell
+$ tree .
+.
+├── CMakeLists.txt
+├── config.json
+├── main.cc
+└── plugins
+    └── tl_elasticsearch
+        ├── ElasticSearchClient.cc
+        ├── ElasticSearchClient.h
+        └── ...
+```
+
+Finally, modify the `CMakeLists.txt` file of the drogon project so that this plugin can be compiled into the project.
+
+```cmake
+# aux_source_directory(plugins PLUGIN_SRC)
+file(GLOB_RECURSE PLUGIN_SRC LIST_DIRECTORIES true "plugins/*.cc")
 ```
 
 ## config
