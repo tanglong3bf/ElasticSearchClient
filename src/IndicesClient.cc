@@ -1,82 +1,13 @@
 /**
  *
- *  ElasticSearchClient.cc
+ *  IndicesClient.cc
  *
  */
 
-#include "ElasticSearchClient.h"
-#include <cstdlib>
-#include <drogon/HttpRequest.h>
-#include <drogon/HttpTypes.h>
-#include <drogon/drogon_callbacks.h>
-#include <exception>
-#include <future>
-#include <json/value.h>
-#include <drogon/HttpClient.h>
-#include <memory>
-#include <trantor/utils/Date.h>
-#include <trantor/utils/Logger.h>
+#include "IndicesClient.h"
 
 using namespace std;
-
-using namespace drogon;
-
 using namespace tl::elasticsearch;
-
-Json::Value ElasticSearchHttpClient::sendRequest(
-    const std::string &path,
-    drogon::HttpMethod method,
-    const Json::Value &requestBody) {
-
-    unique_ptr<promise<Json::Value>> pro(new promise<Json::Value>);
-    auto f = pro->get_future();
-    this->sendRequest(path, method, [&pro](Json::Value &response) {
-        try {
-            pro->set_value(response);
-        }
-        catch (...) {
-            pro->set_exception(std::current_exception());
-        }
-    }, [&pro](ElasticSearchException &&err){
-        pro->set_exception(std::make_exception_ptr(err));
-    }, requestBody);
-    return f.get();
-}
-
-void ElasticSearchHttpClient::sendRequest(const std::string &path,
-    HttpMethod method,
-    const std::function<void (Json::Value &)> &&resultCallback,
-    const std::function<void (ElasticSearchException &&)> &&exceptionCallback,
-    const Json::Value &requestBody) {
-
-    auto req = HttpRequest::newHttpRequest();
-    req->setMethod(method);
-    req->setPath(path);
-    req->setContentTypeCode(CT_APPLICATION_JSON);
-    req->setBody(requestBody.toStyledString());
-
-    auto client = HttpClient::newHttpClient(url_);
-    client->sendRequest(req, [
-        this,
-        resultCallback = move(resultCallback),
-        exceptionCallback = move(exceptionCallback)
-    ] (ReqResult result, const HttpResponsePtr &response) {
-        if (result != ReqResult::Ok) {
-            string errorMessage = "failed while sending request to server! url: [";
-            errorMessage += url_;
-            errorMessage += "], result: [";
-            errorMessage += to_string(result);
-            errorMessage += "].";
-
-            LOG_WARN << errorMessage;
-            exceptionCallback(ElasticSearchException(errorMessage));
-        } else {
-            auto responseBody = response->getJsonObject();
-            LOG_TRACE << responseBody->toStyledString();
-            resultCallback(*responseBody);
-        }
-    });
-}
 
 void CreateIndexResponse::setByJson(const Json::Value &response) {
     this->acknowledged_ = response.get("acknowledged", false).asBool();
@@ -125,31 +56,32 @@ Json::Value CreateIndexParam::toJson() const {
         }
     }
 
-    Json::Value _doc;
-    _doc["properties"] = properties;
-
-    Json::Value mappings;
-    mappings["_doc"] = _doc;
-    result["mappings"] = mappings;
+    if (!properties.empty()) {
+        Json::Value mappings;
+        Json::Value _doc;
+        _doc["properties"] = properties;
+        mappings["_doc"] = _doc;
+        result["mappings"] = mappings;
+    }
 
     return move(result);
 }
 
-std::string CreateIndexParam::toJsonString() const {
+string CreateIndexParam::toJsonString() const {
     return toJson().toStyledString();
 }
 
 void Settings::setByJson(const Json::Value &json) {
     auto index = json.get("index", {});
     auto timeStampStr = index.get("creation_date", "").asString();
-    auto timeStamp = std::atol(timeStampStr.c_str());
+    auto timeStamp = atol(timeStampStr.c_str());
     this->creation_date_ = trantor::Date(timeStamp * 1000);
 
     auto number_of_shards = index.get("number_of_shards", "5").asString();
-    this->number_of_shards_ = std::atoi(number_of_shards.c_str());
+    this->number_of_shards_ = atoi(number_of_shards.c_str());
 
     auto number_of_replicas = index.get("number_of_replicas", "1").asString();
-    this->number_of_replicas_ = std::atoi(number_of_replicas.c_str());
+    this->number_of_replicas_ = atoi(number_of_replicas.c_str());
 
     this->uuid_ = index.get("uuid", "").asString();
     this->version_created_ = index.get("version", {}).get("created", "").asString();
@@ -242,7 +174,7 @@ const Json::Value PutMappingParam::toJson() const {
     return move(result);
 }
 
-const std::string PutMappingParam::toJsonString() const {
+const string PutMappingParam::toJsonString() const {
     return this->toJson().toStyledString();
 }
 
@@ -251,7 +183,7 @@ void DeleteIndexResponse::setByJson(const Json::Value &response) {
 }
 
 CreateIndexResponsePtr IndicesClient::create(
-    const std::string &indexName,
+    const string &indexName,
     const CreateIndexParam &param) const {
 
     unique_ptr<promise<CreateIndexResponsePtr>> pro(new promise<CreateIndexResponsePtr>);
@@ -261,10 +193,10 @@ CreateIndexResponsePtr IndicesClient::create(
             pro->set_value(response);
         }
         catch (...) {
-            pro->set_exception(std::current_exception());
+            pro->set_exception(current_exception());
         }
     }, [&pro](ElasticSearchException &&err){
-        pro->set_exception(std::make_exception_ptr(err));
+        pro->set_exception(make_exception_ptr(err));
     }, param);
     return f.get();
 }
@@ -278,7 +210,7 @@ void IndicesClient::create(
     string path("/");
     path += indexName;
 
-    httpClient_->sendRequest(path, Put, [
+    httpClient_->sendRequest(path, drogon::Put, [
         resultCallback = move(resultCallback),
         exceptionCallback = move(exceptionCallback)
     ](Json::Value &responseBody) {
@@ -300,7 +232,7 @@ void IndicesClient::create(
     }, move(exceptionCallback) , param.toJson());
 }
 
-GetIndexResponsePtr IndicesClient::get(const std::string &indexName) const {
+GetIndexResponsePtr IndicesClient::get(const string &indexName) const {
     unique_ptr<promise<GetIndexResponsePtr>> pro(new promise<GetIndexResponsePtr>);
     auto f = pro->get_future();
     this->get(indexName, [&pro](GetIndexResponsePtr &response) {
@@ -308,23 +240,23 @@ GetIndexResponsePtr IndicesClient::get(const std::string &indexName) const {
             pro->set_value(response);
         }
         catch (...) {
-            pro->set_exception(std::current_exception());
+            pro->set_exception(current_exception());
         }
     }, [&pro](ElasticSearchException &&err){
-        pro->set_exception(std::make_exception_ptr(err));
+        pro->set_exception(make_exception_ptr(err));
     });
     return f.get();
 }
 
 void IndicesClient::get(
-    const std::string &indexName,
-    const std::function<void (GetIndexResponsePtr &)> &&resultCallback,
-    const std::function<void (ElasticSearchException &&)> &&exceptionCallback) const {
+    const string &indexName,
+    const function<void (GetIndexResponsePtr &)> &&resultCallback,
+    const function<void (ElasticSearchException &&)> &&exceptionCallback) const {
 
     string path("/");
     path += indexName;
 
-    httpClient_->sendRequest(path, Get, [
+    httpClient_->sendRequest(path, drogon::Get, [
         indexName = move(indexName),
         resultCallback = move(resultCallback),
         exceptionCallback = move(exceptionCallback)
@@ -340,7 +272,7 @@ void IndicesClient::get(
             errorMessage += "]";
             exceptionCallback(ElasticSearchException(errorMessage));
         } else {
-            GetIndexResponsePtr response = std::make_shared<GetIndexResponse>();
+            GetIndexResponsePtr response = make_shared<GetIndexResponse>();
             response->setByJson(responseBody.get(indexName, {}));
             resultCallback(response);
         }
@@ -348,7 +280,7 @@ void IndicesClient::get(
 }
 
 PutMappingResponsePtr IndicesClient::putMapping(
-    const std::string &indexName,
+    const string &indexName,
     const PutMappingParam &param) const {
     unique_ptr<promise<PutMappingResponsePtr>> pro(new promise<PutMappingResponsePtr>);
     auto f = pro->get_future();
@@ -357,25 +289,25 @@ PutMappingResponsePtr IndicesClient::putMapping(
             pro->set_value(response);
         }
         catch (...) {
-            pro->set_exception(std::current_exception());
+            pro->set_exception(current_exception());
         }
     }, [&pro](ElasticSearchException &&err){
-        pro->set_exception(std::make_exception_ptr(err));
+        pro->set_exception(make_exception_ptr(err));
     }, param);
     return f.get();
 }
 
 void IndicesClient::putMapping(
-    const std::string &indexName,
-    const std::function<void (PutMappingResponsePtr &)> &&resultCallback,
-    const std::function<void (ElasticSearchException &&)> &&exceptionCallback,
+    const string &indexName,
+    const function<void (PutMappingResponsePtr &)> &&resultCallback,
+    const function<void (ElasticSearchException &&)> &&exceptionCallback,
     const PutMappingParam &param) const {
 
     string path("/");
     path += indexName;
     path += "/_mapping/_doc";
 
-    httpClient_->sendRequest(path, Put, [
+    httpClient_->sendRequest(path, drogon::Put, [
         resultCallback = move(resultCallback),
         exceptionCallback = move(exceptionCallback)
     ] (Json::Value &responseBody) {
@@ -390,14 +322,14 @@ void IndicesClient::putMapping(
             errorMessage += "]";
             exceptionCallback(ElasticSearchException(errorMessage));
         } else {
-            PutMappingResponsePtr response = std::make_shared<PutMappingResponse>();
+            PutMappingResponsePtr response = make_shared<PutMappingResponse>();
             response->setByJson(responseBody);
             resultCallback(response);
         }
     }, move(exceptionCallback), param.toJson());
 }
 
-DeleteIndexResponsePtr IndicesClient::deleteIndex(const std::string &indexName) const {
+DeleteIndexResponsePtr IndicesClient::deleteIndex(const string &indexName) const {
     unique_ptr<promise<DeleteIndexResponsePtr>> pro(new promise<DeleteIndexResponsePtr>);
     auto f = pro->get_future();
     this->deleteIndex(indexName, [&pro](DeleteIndexResponsePtr &response) {
@@ -405,23 +337,23 @@ DeleteIndexResponsePtr IndicesClient::deleteIndex(const std::string &indexName) 
             pro->set_value(response);
         }
         catch (...) {
-            pro->set_exception(std::current_exception());
+            pro->set_exception(current_exception());
         }
     }, [&pro](ElasticSearchException &&err){
-        pro->set_exception(std::make_exception_ptr(err));
+        pro->set_exception(make_exception_ptr(err));
     });
     return f.get();
 }
 
 void IndicesClient::deleteIndex(
-    const std::string &indexName,
-    const std::function<void (DeleteIndexResponsePtr &)> &&resultCallback,
-    const std::function<void (ElasticSearchException &&)> &&exceptionCallback) const {
+    const string &indexName,
+    const function<void (DeleteIndexResponsePtr &)> &&resultCallback,
+    const function<void (ElasticSearchException &&)> &&exceptionCallback) const {
 
     string path("/");
     path += indexName;
 
-    httpClient_->sendRequest(path, Delete, [
+    httpClient_->sendRequest(path, drogon::Delete, [
         resultCallback = move(resultCallback),
         exceptionCallback = move(exceptionCallback)
     ] (Json::Value &responseBody) {
@@ -436,37 +368,9 @@ void IndicesClient::deleteIndex(
             errorMessage += "]";
             exceptionCallback(ElasticSearchException(errorMessage));
         } else {
-            DeleteIndexResponsePtr response = std::make_shared<DeleteIndexResponse>();
+            DeleteIndexResponsePtr response = make_shared<DeleteIndexResponse>();
             response->setByJson(responseBody);
             resultCallback(response);
         }
     }, move(exceptionCallback));
-}
-
-void ElasticSearchClient::initAndStart(const Json::Value &config) {
-    /// Initialize and start the plugin
-    this->host_ = config.get("host", Json::Value("localhost")).asString();
-    this->port_ = config.get("port", Json::Value(9200)).asUInt();
-
-    string url("http://");
-    url += this->host_;
-    if (this->port_ != 80) {
-        url += ":";
-        url += std::to_string(this->port_);
-    }
-
-    this->httpClient_ = std::shared_ptr<ElasticSearchHttpClient>(new ElasticSearchHttpClient(url));
-    this->indices_ = IndicesClientPtr(new IndicesClient(httpClient_));
-}
-
-void ElasticSearchClient::shutdown() {
-    /// Shutdown the plugin
-}
-
-IndicesClientPtr ElasticSearchClient::indices() const {
-    return indices_;
-}
-
-std::shared_ptr<ElasticSearchHttpClient> ElasticSearchClient::httpClient() const {
-    return httpClient_;
 }
