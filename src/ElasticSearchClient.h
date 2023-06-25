@@ -9,6 +9,7 @@
 #include <memory>
 #include <drogon/plugins/Plugin.h>
 #include "IndicesClient.h"
+#include "DocumentsClient.h"
 
 namespace tl::elasticsearch {
 
@@ -22,12 +23,36 @@ public:
     /// This method must be called by drogon to shutdown the plugin.
     /// It must be implemented by the user.
     void shutdown() override;
+
 public:
     IndicesClientPtr indices() const;
     std::shared_ptr<HttpClient> httpClient() const;
+
+public:
+    // operations of document
+    IndexResponsePtr index(const IndexParam &param, const Document &doc) const {
+        return this->documents_->index(param, doc);
+    }
+    void index(
+        const IndexParam &param,
+        const Document &doc,
+        const std::function<void (IndexResponsePtr &)> &&resultCallback,
+        const std::function<void (ElasticSearchException &&)> &&exceptionCallback
+        ) const {
+
+        this->documents_->index(
+            param,
+            doc,
+            std::move(resultCallback),
+            std::move(exceptionCallback)
+        );
+    }
+
 private:
     IndicesClientPtr indices_;
     std::shared_ptr<HttpClient> httpClient_;
+    DocumentsClientPtr documents_;
+
 private:
     std::string host_;
     int16_t port_;
