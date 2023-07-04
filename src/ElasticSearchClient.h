@@ -48,6 +48,22 @@ public:
         );
     }
 
+    DeleteResponsePtr deleteDocument(const DeleteParam &param) const {
+        return this->documents_->deleteDocument(param);
+    }
+    void deleteDocument(
+        const DeleteParam &param,
+        const std::function<void (DeleteResponsePtr &)> &&resultCallback,
+        const std::function<void (ElasticSearchException &&)> &&exceptionCallback
+        ) const {
+
+        this->documents_->deleteDocument(
+            param,
+            std::move(resultCallback),
+            std::move(exceptionCallback)
+        );
+    }
+
 private:
     IndicesClientPtr indices_;
     std::shared_ptr<HttpClient> httpClient_;

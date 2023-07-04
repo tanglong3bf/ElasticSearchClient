@@ -19,7 +19,34 @@ void Shards::setByJson(const Json::Value &json) {
 
 void IndexResponse::setByJson(const Json::Value &json) {
     if (json.isMember("_id")) {
-        id_ = json["_id"].asInt();
+        id_ = json["_id"].asString();
+    }
+    if (json.isMember("_index")) {
+        index_ = json["_index"].asString();
+    }
+    if (json.isMember("_primary_term")) {
+        primary_term_ = json["_primary_term"].asInt();
+    }
+    if (json.isMember("_seq_no")) {
+        seq_no_ = json["_seq_no"].asInt();
+    }
+    if (json.isMember("_shards")) {
+        shards_->setByJson(json["_shards"]);
+    }
+    if (json.isMember("_type")) {
+        type_ = json["_type"].asString();
+    }
+    if (json.isMember("_version")) {
+        version_ = json["_version"].asInt();
+    }
+    if (json.isMember("result")) {
+        result_ = json["result"].asString();
+    }
+}
+
+void DeleteResponse::setByJson(const Json::Value &json) {
+    if (json.isMember("_id")) {
+        id_ = json["_id"].asString();
     }
     if (json.isMember("_index")) {
         index_ = json["_index"].asString();
@@ -74,20 +101,48 @@ void DocumentsClient::index(
         resultCallback = move(resultCallback),
         exceptionCallback = move(exceptionCallback)
     ](Json::Value &responseBody) {
-        if (responseBody.isMember("error")) {
-            auto error = responseBody.get("error", {});
-            auto type = error.get("type", {}).asString();
-            auto reason = error.get("reason", {}).asString();
-            string errorMessage = "ElasticSearchException [type=";
-            errorMessage += type;
-            errorMessage += ", reason=";
-            errorMessage += reason;
-            errorMessage += "]";
+        IndexResponsePtr i_result = make_shared<IndexResponse>();
+        i_result->setByJson(responseBody);
+        resultCallback(i_result);
+    }, move(exceptionCallback) , doc.toJson());
+}
+
+DeleteResponsePtr DocumentsClient::deleteDocument(const DeleteParam &param) const {
+    unique_ptr<promise<DeleteResponsePtr>> pro(new promise<DeleteResponsePtr>);
+    auto f = pro->get_future();
+    this->deleteDocument(param, [&pro] (DeleteResponsePtr &response) {
+        try {
+            pro->set_value(response);
+        }
+        catch (...) {
+            pro->set_exception(current_exception());
+        }
+    }, [&pro] (ElasticSearchException &&err) {
+        pro->set_exception(make_exception_ptr(err));
+    });
+    return f.get();
+}
+
+void DocumentsClient::deleteDocument(
+    const DeleteParam &param,
+    const std::function<void (DeleteResponsePtr &)> &&resultCallback,
+    const std::function<void (ElasticSearchException &&)> &&exceptionCallback
+) const {
+    std::string path = "/";
+    path += param.index_;
+    path += "/_doc/";
+    path += param.id_;
+    httpClient_->sendRequest(path, drogon::Delete, [
+        resultCallback = move(resultCallback),
+        exceptionCallback = move(exceptionCallback)
+    ](Json::Value &responseBody) {
+        if (responseBody.isMember("result") && responseBody["result"].asString() == "not_found") {
+            string errorMessage = "ElasticSearchException [Delete document failed. Because document is not_found.]";
             exceptionCallback(ElasticSearchException(errorMessage));
         } else {
-            IndexResponsePtr i_result = make_shared<IndexResponse>();
-            i_result->setByJson(responseBody);
-            resultCallback(i_result);
+            DeleteResponsePtr d_result = make_shared<DeleteResponse>();
+            d_result->setByJson(responseBody);
+            resultCallback(d_result);
         }
-    }, move(exceptionCallback) , doc.toJson());
+    }, move(exceptionCallback));
 }

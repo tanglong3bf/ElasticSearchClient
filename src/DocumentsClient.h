@@ -34,7 +34,7 @@ using ShardsPtr = std::shared_ptr<Shards>;
 
 class IndexResponse {
 public:
-    int getId() const {
+    std::string getId() const {
         return id_;
     }
     const std::string &getIndex() const {
@@ -60,7 +60,7 @@ public:
     }
     void setByJson(const Json::Value &json);
 private:
-    int id_;
+    std::string id_;
     std::string index_;
     int primary_term_;
     int seq_no_;
@@ -70,30 +70,72 @@ private:
     // TODO:
     std::string result_;
 };
-/*
-{
-        "_id" : "1",
-        "_index" : "sbxd",
-        "_primary_term" : 1,
-        "_seq_no" : 0,
-        "_shards" :
-        {
-                "failed" : 0,
-                "successful" : 1,
-                "total" : 2
-        },
-        "_type" : "_doc",
-        "_version" : 1,
-        "result" : "created"
-}
-*/
+
 using IndexResponsePtr = std::shared_ptr<IndexResponse>;
 
 class IndexParam {
+friend class DocumentsClient;
 public:
     IndexParam(std::string index)
         : index_(index) {}
+    void setId(std::string id) {
+        id_ = id;
+    }
+private:
+    std::string index_;
+    std::string id_;
+};
+
+class DeleteResponse {
 public:
+    std::string getId() const {
+        return id_;
+    }
+    const std::string &getIndex() const {
+        return index_;
+    }
+    int getPrimaryTerm() const {
+        return primary_term_;
+    }
+    int getSeqNo() const {
+        return seq_no_;
+    }
+    const std::string &getType() const {
+        return type_;
+    }
+    ShardsPtr getShards() const {
+        return shards_;
+    }
+    int getVersion() const {
+        return version_;
+    }
+    const std::string &getResult() const {
+        return result_;
+    }
+    void setByJson(const Json::Value &json);
+private:
+    std::string id_;
+    std::string index_;
+    int primary_term_;
+    int seq_no_;
+    std::string type_;
+    ShardsPtr shards_;
+    int version_;
+    // TODO:
+    std::string result_;
+};
+
+using DeleteResponsePtr = std::shared_ptr<DeleteResponse>;
+
+class DeleteParam {
+friend class DocumentsClient;
+public:
+    DeleteParam(std::string index)
+        : index_(index) {}
+    void setId(std::string id) {
+        id_ = id;
+    }
+private:
     std::string index_;
     std::string id_;
 };
@@ -108,6 +150,13 @@ public:
         const IndexParam &param,
         const Document &doc,
         const std::function<void (IndexResponsePtr &)> &&resultCallback,
+        const std::function<void (ElasticSearchException &&)> &&exceptionCallback
+    ) const;
+
+    DeleteResponsePtr deleteDocument(const DeleteParam &param) const;
+    void deleteDocument(
+        const DeleteParam &param,
+        const std::function<void (DeleteResponsePtr &)> &&resultCallback,
         const std::function<void (ElasticSearchException &&)> &&exceptionCallback
     ) const;
 private:
