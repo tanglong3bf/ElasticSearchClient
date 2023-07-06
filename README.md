@@ -2,6 +2,10 @@
 
 ElasticSearchClient is a [Drogon](https://github.com/drogonframework/drogon.git) plugin that can interact with the ElasticSearch server in a more concise way.
 
+# Requirements
+
+- ElasticSearch v6.8 (Only this version has been tested)
+
 # HowToUse
 
 ## Install
