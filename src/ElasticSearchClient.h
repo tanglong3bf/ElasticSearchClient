@@ -64,6 +64,24 @@ public:
         );
     }
 
+    UpdateResponsePtr update(const UpdateParam &param, const Document &doc) const {
+        return this->documents_->update(param, doc);
+    }
+    void update(
+        const UpdateParam &param,
+        const Document &doc,
+        const std::function<void (UpdateResponsePtr &)> &&resultCallback,
+        const std::function<void (ElasticSearchException &&)> &&exceptionCallback
+        ) const {
+
+        this->documents_->update(
+            param,
+            doc,
+            std::move(resultCallback),
+            std::move(exceptionCallback)
+        );
+    }
+
 private:
     IndicesClientPtr indices_;
     std::shared_ptr<HttpClient> httpClient_;
