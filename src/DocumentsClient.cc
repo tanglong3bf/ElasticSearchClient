@@ -98,6 +98,33 @@ void UpdateResponse::setByJson(const Json::Value &json) {
     }
 }
 
+void GetResponse::setByJson(const Json::Value &json) {
+    if (json.isMember("_id")) {
+        id_ = json["_id"].asString();
+    }
+    if (json.isMember("_index")) {
+        index_ = json["_index"].asString();
+    }
+    if (json.isMember("_primary_term")) {
+        primary_term_ = json["_primary_term"].asInt();
+    }
+    if (json.isMember("_seq_no")) {
+        seq_no_ = json["_seq_no"].asInt();
+    }
+    if (json.isMember("_source")) {
+        source_ = json["_source"];
+    }
+    if (json.isMember("_type")) {
+        type_ = json["_type"].asString();
+    }
+    if (json.isMember("_version")) {
+        version_ = json["_version"].asInt();
+    }
+    if (json.isMember("found")) {
+        found_ = json["found"].asBool();
+    }
+}
+
 IndexResponsePtr DocumentsClient::index(const IndexParam &param, const Document &doc) const {
     unique_ptr<promise<IndexResponsePtr>> pro(new promise<IndexResponsePtr>);
     auto f = pro->get_future();
@@ -225,4 +252,44 @@ void DocumentsClient::update(
             resultCallback(u_result);
         }
     }, move(exceptionCallback), requestBody);
+}
+
+GetResponsePtr DocumentsClient::get(const GetParam &param) const {
+    unique_ptr<promise<GetResponsePtr>> pro(new promise<GetResponsePtr>);
+    auto f = pro->get_future();
+    this->get(param, [&pro] (GetResponsePtr &response) {
+        try {
+            pro->set_value(response);
+        }
+        catch (...) {
+            pro->set_exception(current_exception());
+        }
+    }, [&pro] (ElasticSearchException &&err) {
+        pro->set_exception(make_exception_ptr(err));
+    });
+    return f.get();
+}
+
+void DocumentsClient::get(
+    const GetParam &param,
+    const std::function<void (GetResponsePtr &)> &&resultCallback,
+    const std::function<void (ElasticSearchException &&)> &&exceptionCallback
+) const {
+    std::string path = "/";
+    path += param.index_;
+    path += "/_doc/";
+    path += param.id_;
+    httpClient_->sendRequest(path, drogon::Get, [
+        resultCallback = move(resultCallback),
+        exceptionCallback = move(exceptionCallback)
+    ](Json::Value &responseBody) {
+        if (responseBody.isMember("result") && responseBody["result"].asString() == "not_found") {
+            string errorMessage = "ElasticSearchException [Get document failed. Because document is not_found.]";
+            exceptionCallback(ElasticSearchException(errorMessage));
+        } else {
+            GetResponsePtr d_result = make_shared<GetResponse>();
+            d_result->setByJson(responseBody);
+            resultCallback(d_result);
+        }
+    }, move(exceptionCallback));
 }

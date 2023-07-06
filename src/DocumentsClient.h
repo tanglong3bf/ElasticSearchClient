@@ -194,6 +194,59 @@ private:
     std::string id_;
 };
 
+class GetResponse {
+public:
+    std::string getId() const {
+        return id_;
+    }
+    const std::string &getIndex() const {
+        return index_;
+    }
+    int getPrimaryTerm() const {
+        return primary_term_;
+    }
+    int getSeqNo() const {
+        return seq_no_;
+    }
+    Json::Value getSource() const {
+        return source_;
+    }
+    const std::string &getType() const {
+        return type_;
+    }
+    int getVersion() const {
+        return version_;
+    }
+    const bool getFound() const {
+        return found_;
+    }
+    void setByJson(const Json::Value &json);
+private:
+    std::string id_;
+    std::string index_;
+    int primary_term_;
+    int seq_no_;
+    Json::Value source_;
+    std::string type_;
+    int version_;
+    bool found_;
+};
+
+using GetResponsePtr = std::shared_ptr<GetResponse>;
+
+class GetParam {
+friend class DocumentsClient;
+public:
+    GetParam(std::string index)
+        : index_(index) {}
+    void setId(std::string id) {
+        id_ = id;
+    }
+private:
+    std::string index_;
+    std::string id_;
+};
+
 class DocumentsClient {
 public:
     DocumentsClient(HttpClientPtr httpClient)
@@ -221,6 +274,14 @@ public:
         const std::function<void (UpdateResponsePtr &)> &&resultCallback,
         const std::function<void (ElasticSearchException &&)> &&exceptionCallback
     ) const;
+
+    GetResponsePtr get(const GetParam &param) const;
+    void get(
+        const GetParam &param,
+        const std::function<void (GetResponsePtr &)> &&resultCallback,
+        const std::function<void (ElasticSearchException &&)> &&exceptionCallback
+    ) const;
+
 private:
     std::shared_ptr<HttpClient> httpClient_;
 };

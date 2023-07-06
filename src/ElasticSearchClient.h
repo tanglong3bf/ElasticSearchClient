@@ -82,6 +82,22 @@ public:
         );
     }
 
+    GetResponsePtr get(const GetParam &param) const {
+        return this->documents_->get(param);
+    }
+    void get(
+        const GetParam &param,
+        const std::function<void (GetResponsePtr &)> &&resultCallback,
+        const std::function<void (ElasticSearchException &&)> &&exceptionCallback
+        ) const {
+
+        this->documents_->get(
+            param,
+            std::move(resultCallback),
+            std::move(exceptionCallback)
+        );
+    }
+
 private:
     IndicesClientPtr indices_;
     std::shared_ptr<HttpClient> httpClient_;
