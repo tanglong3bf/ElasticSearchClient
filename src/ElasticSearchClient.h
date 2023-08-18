@@ -6,15 +6,15 @@
 
 #pragma once
 
-#include <memory>
-#include <drogon/plugins/Plugin.h>
-#include "IndicesClient.h"
 #include "DocumentsClient.h"
+#include "IndicesClient.h"
+#include <drogon/HttpTypes.h>
+#include <drogon/plugins/Plugin.h>
+#include <memory>
 
 namespace tl::elasticsearch {
 
-class ElasticSearchClient : public drogon::Plugin<ElasticSearchClient>
-{
+class ElasticSearchClient : public drogon::Plugin<ElasticSearchClient> {
 public:
     /// This method must be called by drogon to initialize and start the plugin.
     /// It must be implemented by the user.
@@ -25,7 +25,7 @@ public:
     void shutdown() override;
 
 public:
-    IndicesClientPtr indices() const;
+    IndicesClientPtr            indices() const;
     std::shared_ptr<HttpClient> httpClient() const;
 
 public:
@@ -33,79 +33,75 @@ public:
     IndexResponsePtr index(const IndexParam &param, const Document &doc) const {
         return this->documents_->index(param, doc);
     }
-    void index(
-        const IndexParam &param,
-        const Document &doc,
-        const std::function<void (IndexResponsePtr &)> &&resultCallback,
-        const std::function<void (ElasticSearchException &&)> &&exceptionCallback
-        ) const {
 
+    void index(
+      const IndexParam                                      &param,
+      const Document                                        &doc,
+      const std::function<void(IndexResponsePtr &)>        &&resultCallback,
+      const std::function<void(ElasticSearchException &&)> &&exceptionCallback
+    ) const {
         this->documents_->index(
-            param,
-            doc,
-            std::move(resultCallback),
-            std::move(exceptionCallback)
+          param, doc, std::move(resultCallback), std::move(exceptionCallback)
         );
     }
 
     DeleteResponsePtr deleteDocument(const DeleteParam &param) const {
         return this->documents_->deleteDocument(param);
     }
-    void deleteDocument(
-        const DeleteParam &param,
-        const std::function<void (DeleteResponsePtr &)> &&resultCallback,
-        const std::function<void (ElasticSearchException &&)> &&exceptionCallback
-        ) const {
 
+    void deleteDocument(
+      const DeleteParam                                     &param,
+      const std::function<void(DeleteResponsePtr &)>       &&resultCallback,
+      const std::function<void(ElasticSearchException &&)> &&exceptionCallback
+    ) const {
         this->documents_->deleteDocument(
-            param,
-            std::move(resultCallback),
-            std::move(exceptionCallback)
+          param, std::move(resultCallback), std::move(exceptionCallback)
         );
     }
 
-    UpdateResponsePtr update(const UpdateParam &param, const Document &doc) const {
+    UpdateResponsePtr
+    update(const UpdateParam &param, const Document &doc) const {
         return this->documents_->update(param, doc);
     }
-    void update(
-        const UpdateParam &param,
-        const Document &doc,
-        const std::function<void (UpdateResponsePtr &)> &&resultCallback,
-        const std::function<void (ElasticSearchException &&)> &&exceptionCallback
-        ) const {
 
+    void update(
+      const UpdateParam                                     &param,
+      const Document                                        &doc,
+      const std::function<void(UpdateResponsePtr &)>       &&resultCallback,
+      const std::function<void(ElasticSearchException &&)> &&exceptionCallback
+    ) const {
         this->documents_->update(
-            param,
-            doc,
-            std::move(resultCallback),
-            std::move(exceptionCallback)
+          param, doc, std::move(resultCallback), std::move(exceptionCallback)
         );
     }
 
     GetResponsePtr get(const GetParam &param) const {
         return this->documents_->get(param);
     }
-    void get(
-        const GetParam &param,
-        const std::function<void (GetResponsePtr &)> &&resultCallback,
-        const std::function<void (ElasticSearchException &&)> &&exceptionCallback
-        ) const {
 
+    void get(
+      const GetParam                                        &param,
+      const std::function<void(GetResponsePtr &)>          &&resultCallback,
+      const std::function<void(ElasticSearchException &&)> &&exceptionCallback
+    ) const {
         this->documents_->get(
-            param,
-            std::move(resultCallback),
-            std::move(exceptionCallback)
+          param, std::move(resultCallback), std::move(exceptionCallback)
         );
     }
 
+    // operations of search
+    SearchResponsePtr search(const SearchParam &param) const {
+        return this->documents_->search(param);
+    }
+
 private:
-    IndicesClientPtr indices_;
+    IndicesClientPtr            indices_;
     std::shared_ptr<HttpClient> httpClient_;
-    DocumentsClientPtr documents_;
+    DocumentsClientPtr          documents_;
 
 private:
     std::string host_;
-    int16_t port_;
+    int16_t     port_;
 };
 
-}; // namespace: tl::elasticsearch
+}; // namespace tl::elasticsearch

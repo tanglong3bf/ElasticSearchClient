@@ -6,10 +6,10 @@
 
 #include "ElasticSearchClient.h"
 
-#include <memory>
 #include "DocumentsClient.h"
 #include "HttpClient.h"
 #include "IndicesClient.h"
+#include <memory>
 
 using namespace std;
 
@@ -28,8 +28,8 @@ void ElasticSearchClient::initAndStart(const Json::Value &config) {
     }
 
     this->httpClient_ = std::shared_ptr<HttpClient>(new HttpClient(url));
-    this->indices_ = IndicesClientPtr(new IndicesClient(httpClient_));
-    this->documents_ = DocumentsClientPtr(new DocumentsClient(httpClient_));
+    this->indices_    = IndicesClientPtr(new IndicesClient(httpClient_));
+    this->documents_  = DocumentsClientPtr(new DocumentsClient(httpClient_));
 }
 
 void ElasticSearchClient::shutdown() {
