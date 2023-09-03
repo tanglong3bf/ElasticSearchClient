@@ -3,6 +3,7 @@
 
 #include "unittests/ElasticSearchExceptionTest.h"
 #include "unittests/HttpClientTest.h"
+#include "unittests/PropertyTest.h"
 #include "unittests/IndicesClientTest.h"
 
 using namespace drogon;

@@ -126,10 +126,10 @@ void GetIndexResponse::setByJson(const Json::Value &responseBody)
             {
                 auto subPropertyNode = subProperties.get(name, {});
                 auto type = subPropertyNode.get("type", "none").asString();
-                PropertyType propertyType = string2PropertyType(type);
+                PropertyType propertyType = string_to_property_type(type);
 
                 auto index = subPropertyNode.get("index", true).asBool();
-                auto analyzer = subPropertyNode.get("analyzer", "").asString();
+                auto analyzer = subPropertyNode.get("analyzer", "").asCString();
                 Property subProperty(subName, propertyType, analyzer, index);
                 property.addSubProperty(subProperty);
             }
@@ -138,10 +138,10 @@ void GetIndexResponse::setByJson(const Json::Value &responseBody)
         else
         {
             auto type = propertyNode.get("type", "none").asString();
-            PropertyType propertyType = string2PropertyType(type);
+            PropertyType propertyType = string_to_property_type(type);
 
             auto index = propertyNode.get("index", true).asBool();
-            auto analyzer = propertyNode.get("analyzer", "").asString();
+            auto analyzer = propertyNode.get("analyzer", "").asCString();
             this->properties_.push_back(
                 Property(name, propertyType, analyzer, index));
         }

@@ -30,56 +30,44 @@ enum PropertyType
     DATE,
 };
 
-inline std::string to_string(const PropertyType &propertyType)
+inline std::string_view to_string_view(const PropertyType &propertyType)
 {
-    if (propertyType == NONE)
+    switch (propertyType)
     {
-        return "none";
+        case NONE:
+            return "none";
+        case TEXT:
+            return "text";
+        case KEYWORD:
+            return "keyword";
+        case LONG:
+            return "long";
+        case INTEGER:
+            return "integer";
+        case SHORT:
+            return "short";
+        case BYTE:
+            return "byte";
+        case DOUBLE:
+            return "double";
+        case FLOAT:
+            return "float";
+        case BOOLEAN:
+            return "boolean";
+        case DATE:
+            return "date";
+        default:
+            throw tl::elasticsearch::ElasticSearchException("unkown type");
     }
-    if (propertyType == TEXT)
-    {
-        return "text";
-    }
-    if (propertyType == KEYWORD)
-    {
-        return "keyword";
-    }
-    if (propertyType == LONG)
-    {
-        return "long";
-    }
-    if (propertyType == INTEGER)
-    {
-        return "integer";
-    }
-    if (propertyType == SHORT)
-    {
-        return "short";
-    }
-    if (propertyType == BYTE)
-    {
-        return "byte";
-    }
-    if (propertyType == DOUBLE)
-    {
-        return "double";
-    }
-    if (propertyType == FLOAT)
-    {
-        return "float";
-    }
-    if (propertyType == BOOLEAN)
-    {
-        return "boolean";
-    }
-    if (propertyType == DATE)
-    {
-        return "date";
-    }
-    throw std::runtime_error("unkown type");
 }
 
-inline PropertyType string2PropertyType(const std::string &str)
+inline std::string to_string(const PropertyType &propertyType)
+{
+    auto sv = to_string_view(propertyType);
+    return std::string(sv.data(), sv.size());
+}
+
+inline PropertyType string_to_property_type(const std::string &str)
 {
     PropertyType result;
     if (str == "text")
@@ -157,7 +145,7 @@ class Property
 
     Property(const std::string &property_name,
              PropertyType type,
-             const std::string &analyzer,
+             const char *analyzer,
              bool index = true)
         : property_name_(property_name),
           type_(type),
