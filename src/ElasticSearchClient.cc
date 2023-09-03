@@ -15,32 +15,38 @@ using namespace std;
 
 using namespace tl::elasticsearch;
 
-void ElasticSearchClient::initAndStart(const Json::Value &config) {
+void ElasticSearchClient::initAndStart(const Json::Value &config)
+{
+    LOG_TRACE << "加载了插件";
     /// Initialize and start the plugin
     this->host_ = config.get("host", Json::Value("localhost")).asString();
     this->port_ = config.get("port", Json::Value(9200)).asUInt();
 
     string url("http://");
     url += this->host_;
-    if (this->port_ != 80) {
+    if (this->port_ != 80)
+    {
         url += ":";
         url += std::to_string(this->port_);
     }
 
     this->httpClient_ = std::shared_ptr<HttpClient>(new HttpClient(url));
-    this->indices_    = IndicesClientPtr(new IndicesClient(httpClient_));
-    this->documents_  = DocumentsClientPtr(new DocumentsClient(httpClient_));
+    this->indices_ = IndicesClientPtr(new IndicesClient(httpClient_));
+    this->documents_ = DocumentsClientPtr(new DocumentsClient(httpClient_));
 }
 
-void ElasticSearchClient::shutdown() {
+void ElasticSearchClient::shutdown()
+{
     /// Shutdown the plugin
 }
 
-IndicesClientPtr ElasticSearchClient::indices() const {
+IndicesClientPtr ElasticSearchClient::indices() const
+{
     return indices_;
 }
 
-std::shared_ptr<HttpClient> ElasticSearchClient::httpClient() const {
+std::shared_ptr<HttpClient> ElasticSearchClient::httpClient() const
+{
     LOG_DEBUG << httpClient_.get();
     return httpClient_;
 }

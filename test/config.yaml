@@ -1,0 +1,11 @@
+# This is a YAML format configuration file
+app:
+  # number_of_threads: The number of IO threads, 1 by default, if the value is set to 0, the number of threads
+  # is the number of CPU cores
+  number_of_threads: 1
+# plugins: Define all plugins running in the application
+plugins:
+  - name: 'tl::elasticsearch::ElasticSearchClient' 
+    config:
+      host: "192.168.85.143"
+      port: 9200

@@ -11,32 +11,34 @@
 #include <json/json.h>
 #include <memory>
 
-namespace tl::elasticsearch {
+namespace tl::elasticsearch
+{
 
-class HttpClient {
-public:
-    HttpClient(std::string url)
-      : url_(url) {}
+class HttpClient
+{
+  public:
+    HttpClient(std::string url) : url_(url)
+    {
+    }
 
-public:
+  public:
     Json::Value sendRequest(
-      const std::string &path,
-      drogon::HttpMethod method,
-      const Json::Value &requestBody = {}
-    );
+        const std::string &path,
+        drogon::HttpMethod method,
+        const Json::Value &requestBody = Json::Value(Json::objectValue));
 
     void sendRequest(
-      const std::string                                     &path,
-      drogon::HttpMethod                                     method,
-      const std::function<void(Json::Value &)>             &&resultCallback,
-      const std::function<void(ElasticSearchException &&)> &&exceptionCallback,
-      const Json::Value                                     &requestBody = {}
-    );
+        const std::string &path,
+        drogon::HttpMethod method,
+        const std::function<void(const Json::Value &)> &resultCallback,
+        const std::function<void(const ElasticSearchException &)>
+            &exceptionCallback,
+        const Json::Value &requestBody = Json::Value(Json::objectValue));
 
-private:
+  private:
     std::string url_;
 };
 
 using HttpClientPtr = std::shared_ptr<HttpClient>;
 
-}; // namespace tl::elasticsearch
+};  // namespace tl::elasticsearch
