@@ -5,6 +5,7 @@
  */
 
 #include "IndicesClient.h"
+#include <iostream>
 
 using namespace std;
 using namespace tl::elasticsearch;
@@ -87,51 +88,61 @@ string CreateIndexParam::toJsonString() const
 
 void Settings::setByJson(const Json::Value &json)
 {
-    auto index = json.get("index", {});
-    auto timeStampStr = index.get("creation_date", "").asString();
-    auto timeStamp = atol(timeStampStr.c_str());
+    auto index = json["index"];
+    auto timeStampStr = index["creation_date"].asCString();
+    auto timeStamp = atol(timeStampStr);
     this->creation_date_ = trantor::Date(timeStamp * 1000);
 
     auto number_of_shards = index.get("number_of_shards", "5").asString();
-    this->number_of_shards_ = atoi(number_of_shards.c_str());
+    this->number_of_shards_ = stoi(number_of_shards);
 
     auto number_of_replicas = index.get("number_of_replicas", "1").asString();
-    this->number_of_replicas_ = atoi(number_of_replicas.c_str());
+    this->number_of_replicas_ = stoi(number_of_replicas);
 
-    this->uuid_ = index.get("uuid", "").asString();
-    this->version_created_ =
-        index.get("version", {}).get("created", "").asString();
-    this->provided_name_ = index.get("provided_name", "").asString();
+    this->uuid_ = index["uuid"].asString();
+    this->version_created_ = index["version"]["created"].asString();
+    this->provided_name_ = index["provided_name"].asString();
 }
 
 void GetIndexResponse::setByJson(const Json::Value &responseBody)
 {
-    auto aliasesNodes = responseBody.get("aliases", {});
+    auto aliasesNodes = responseBody["aliases"];
     this->aliases_ = aliasesNodes.getMemberNames();
 
-    auto mappings = responseBody.get("mappings", {});
-    auto _doc = mappings.get("_doc", {});
-    auto properties = _doc.get("properties", {});
+    auto mappings = responseBody["mappings"];
+    auto properties = mappings["_doc"]["properties"];
     auto propertiesNames = properties.getMemberNames();
     for (auto &name : propertiesNames)
     {
-        auto propertyNode = properties.get(name, {});
+        auto propertyNode = properties[name];
 
         if (propertyNode.isMember("properties"))
         {
-            auto subProperties = propertyNode.get("properties", {});
+            auto subProperties = propertyNode["properties"];
             auto subPropertiesNames = subProperties.getMemberNames();
             Property property(name);
             for (auto &subName : subPropertiesNames)
             {
-                auto subPropertyNode = subProperties.get(name, {});
+                auto subPropertyNode = subProperties[subName];
+
                 auto type = subPropertyNode.get("type", "none").asString();
                 PropertyType propertyType = string_to_property_type(type);
-
                 auto index = subPropertyNode.get("index", true).asBool();
-                auto analyzer = subPropertyNode.get("analyzer", "").asCString();
-                Property subProperty(subName, propertyType, analyzer, index);
-                property.addSubProperty(subProperty);
+                auto analyzer = subPropertyNode["analyzer"].asString();
+
+                switch (propertyType)
+                {
+                    case NONE:
+                        property.addSubProperty(Property(subName));
+                        break;
+                    case TEXT:
+                        property.addSubProperty(
+                            Property(subName, TEXT, analyzer.c_str(), index));
+                        break;
+                    default:
+                        property.addSubProperty(
+                            Property(subName, propertyType, index));
+                }
             }
             this->properties_.push_back(property);
         }
@@ -139,16 +150,26 @@ void GetIndexResponse::setByJson(const Json::Value &responseBody)
         {
             auto type = propertyNode.get("type", "none").asString();
             PropertyType propertyType = string_to_property_type(type);
-
             auto index = propertyNode.get("index", true).asBool();
-            auto analyzer = propertyNode.get("analyzer", "").asCString();
-            this->properties_.push_back(
-                Property(name, propertyType, analyzer, index));
+            auto analyzer = propertyNode["analyzer"].asString();
+            switch (propertyType)
+            {
+                case NONE:
+                    this->properties_.push_back(Property(name));
+                    break;
+                case TEXT:
+                    this->properties_.push_back(
+                        Property(name, TEXT, analyzer.c_str(), index));
+                    break;
+                default:
+                    this->properties_.push_back(
+                        Property(name, propertyType, index));
+            }
         }
     }
 
     this->settings_ = make_shared<Settings>();
-    auto settings = responseBody.get("settings", {});
+    auto settings = responseBody["settings"];
     this->settings_->setByJson(settings);
 }
 
@@ -325,9 +346,9 @@ void IndicesClient::get(
              std::move(exceptionCallback)](const Json::Value &responseBody) {
             if (responseBody.isMember("error"))
             {
-                auto error = responseBody.get("error", {});
-                auto type = error.get("type", {}).asString();
-                auto reason = error.get("reason", {}).asString();
+                auto error = responseBody["error"];
+                auto type = error["type"].asString();
+                auto reason = error["reason"].asString();
                 string errorMessage = "ElasticSearchException [type=";
                 errorMessage += type;
                 errorMessage += ", reason=";
@@ -338,7 +359,7 @@ void IndicesClient::get(
             else
             {
                 GetIndexResponsePtr response = make_shared<GetIndexResponse>();
-                response->setByJson(responseBody.get(indexName, {}));
+                response->setByJson(responseBody[indexName]);
                 resultCallback(response);
             }
         },

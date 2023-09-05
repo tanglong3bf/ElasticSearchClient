@@ -46,7 +46,7 @@ TEST(PropertyTest, NoneType)
         EXPECT_EQ(0, p.getProperties().size());
     }
     {
-        auto p = Property("p", NONE, "ik_smart");
+        auto p = Property("p", NONE, "ik_smart");  // LOG_WARN
         EXPECT_EQ(NONE, p.getType());
         EXPECT_TRUE(p.getIndex());
         EXPECT_STREQ("ik_smart", p.getAnalyzer().c_str());

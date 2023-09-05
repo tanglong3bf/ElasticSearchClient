@@ -61,7 +61,7 @@ TEST(CreateIndexTest, Test3)
 
     // mainTest
     IndicesClient indicesClient(std::make_shared<HttpClient>(client));
-    tl::elasticsearch::CreateIndexParam param;
+    CreateIndexParam param;
     param.addProperty(Property("info", TEXT, "ik_smart"));
     param.addProperty(Property("email", KEYWORD, false));
     param.addProperty(
@@ -75,4 +75,78 @@ TEST(CreateIndexTest, Test3)
 
     // delete an index
     client.sendRequest("/c3_index_name", drogon::Delete);
+}
+
+TEST(GetIndexTest, Test1) {
+    using namespace tl::elasticsearch;
+    // create an index
+    HttpClient client("http://192.168.85.143:9200");
+    client.sendRequest("/g1_index_name", drogon::Put);
+    
+    // mainTest
+    IndicesClient indicesClient(std::make_shared<HttpClient>(client));
+    auto resp = indicesClient.get("g1_index_name");
+    EXPECT_EQ(0, resp->getAliases().size());
+    EXPECT_EQ(0, resp->getProperties().size());
+    auto settings = resp->getSettings();
+    EXPECT_EQ(5, settings->getNumberOfShards());
+    EXPECT_EQ(1, settings->getNumberOfReplicas());
+
+    // delete an index
+    client.sendRequest("/g1_index_name", drogon::Delete);
+}
+
+TEST(GetIndexTest, Test2) {
+    using namespace tl::elasticsearch;
+    // delete an index
+    HttpClient client("http://192.168.85.143:9200");
+    client.sendRequest("/g2_index_name", drogon::Delete);
+    
+    // mainTest
+    IndicesClient indicesClient(std::make_shared<HttpClient>(client));
+    EXPECT_THROW(indicesClient.get("g2_index_name"), ElasticSearchException);
+}
+
+TEST(GetIndexTest, Test3) {
+    using namespace tl::elasticsearch;
+    // create an index
+    HttpClient client("http://192.168.85.143:9200");
+    IndicesClient indicesClient(std::make_shared<HttpClient>(client));
+    CreateIndexParam param;
+    param.addProperty(Property("info", TEXT, "ik_smart"));
+    param.addProperty(Property("email", KEYWORD, false));
+    param.addProperty(
+        Property("name")
+            .addSubProperty(Property("firstName", TEXT, "ik_smart", false))
+            .addSubProperty(Property("lastName", KEYWORD, true)));
+    indicesClient.create("g3_index_name", param);
+
+    // mainTest
+    auto resp = indicesClient.get("g3_index_name");
+    EXPECT_EQ(0, resp->getAliases().size());
+    auto properties = resp->getProperties();
+    EXPECT_EQ(3, properties.size());
+
+    EXPECT_EQ("email", properties[0].getPropertyName());
+    EXPECT_EQ(KEYWORD, properties[0].getType());
+    EXPECT_FALSE(properties[0].getIndex());
+    EXPECT_STREQ("", properties[0].getAnalyzer().c_str());
+    EXPECT_EQ(0, properties[0].getProperties().size());
+
+    EXPECT_EQ("info", properties[1].getPropertyName());
+    EXPECT_EQ(TEXT, properties[1].getType());
+    EXPECT_TRUE(properties[1].getIndex());
+    EXPECT_STREQ("ik_smart", properties[1].getAnalyzer().c_str());
+    EXPECT_EQ(0, properties[1].getProperties().size());
+
+    EXPECT_EQ("name", properties[2].getPropertyName());
+    EXPECT_EQ(NONE, properties[2].getType());
+    EXPECT_EQ(2, properties[2].getProperties().size());
+
+    auto settings = resp->getSettings();
+    EXPECT_EQ(5, settings->getNumberOfShards());
+    EXPECT_EQ(1, settings->getNumberOfReplicas());
+
+    // delete an index
+    client.sendRequest("/g3_index_name", drogon::Delete);
 }
