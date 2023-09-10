@@ -160,12 +160,13 @@ TEST(PutMappingTest, Test1)
 {
     using namespace tl::elasticsearch;
     HttpClient client("http://192.168.85.143:9200");
+    client.sendRequest("/p1_index_name", drogon::Delete);
 
     // mainTest
     IndicesClient indicesClient(std::make_shared<HttpClient>(client));
     PutMappingParam param;
     param.addProperty({"title", TEXT, "ik_smart"});
-    ASSERT_THROW(indicesClient.putMapping("p1_index_name", param),
+    EXPECT_THROW(indicesClient.putMapping("p1_index_name", param),
                  ElasticSearchException);
 }
 
@@ -209,4 +210,28 @@ TEST(PutMappingTest, Test3)
 
     // delete an index
     client.sendRequest("/p3_index_name", drogon::Delete);
+}
+
+TEST(DeleteIndexTest, Test1) {
+    using namespace tl::elasticsearch;
+    // delete an index
+    HttpClient client("http://192.168.85.143:9200");
+    client.sendRequest("/d1_index_name", drogon::Delete);
+
+    // mainTest
+    IndicesClient indicesClient(std::make_shared<HttpClient>(client));
+    EXPECT_THROW(indicesClient.deleteIndex("d1_index_name"), ElasticSearchException);
+}
+
+TEST(DeleteIndexTest, Test2) {
+    using namespace tl::elasticsearch;
+    // delete an index
+    HttpClient client("http://192.168.85.143:9200");
+    client.sendRequest("/d2_index_name", drogon::Put);
+
+    // mainTest
+    IndicesClient indicesClient(std::make_shared<HttpClient>(client));
+    auto resp = indicesClient.deleteIndex("d2_index_name");
+    EXPECT_TRUE(resp->isAcknowledged());
+    client.sendRequest("/d2_index_name", drogon::Delete);
 }
