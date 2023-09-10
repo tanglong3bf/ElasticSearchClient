@@ -175,7 +175,7 @@ void GetIndexResponse::setByJson(const Json::Value &responseBody)
 
 void PutMappingResponse::setByJson(const Json::Value &response)
 {
-    this->acknowledged_ = response.get("acknowledged", false).asBool();
+    this->acknowledged_ = response["acknowledged"].asBool();
 }
 
 PutMappingParam &PutMappingParam::addProperty(const Property &property)
@@ -237,7 +237,7 @@ const string PutMappingParam::toJsonString() const
 
 void DeleteIndexResponse::setByJson(const Json::Value &response)
 {
-    this->acknowledged_ = response.get("acknowledged", false).asBool();
+    this->acknowledged_ = response["acknowledged"].asBool();
 }
 
 CreateIndexResponsePtr IndicesClient::create(
@@ -283,9 +283,9 @@ void IndicesClient::create(
              std::move(exceptionCallback)](const Json::Value &responseBody) {
             if (responseBody.isMember("error"))
             {
-                auto error = responseBody.get("error", {});
-                auto type = error.get("type", {}).asString();
-                auto reason = error.get("reason", {}).asString();
+                auto error = responseBody["error"];
+                auto type = error["type"].asString();
+                auto reason = error["reason"].asString();
                 string errorMessage = "ElasticSearchException [type=";
                 errorMessage += type;
                 errorMessage += ", reason=";
@@ -410,9 +410,9 @@ void IndicesClient::putMapping(
              std::move(exceptionCallback)](const Json::Value &responseBody) {
             if (responseBody.isMember("error"))
             {
-                auto error = responseBody.get("error", {});
-                auto type = error.get("type", {}).asString();
-                auto reason = error.get("reason", {}).asString();
+                auto error = responseBody["error"];
+                auto type = error["type"].asString();
+                auto reason = error["reason"].asString();
                 string errorMessage = "ElasticSearchException [type=";
                 errorMessage += type;
                 errorMessage += ", reason=";
@@ -472,9 +472,9 @@ void IndicesClient::deleteIndex(
              std::move(exceptionCallback)](const Json::Value &responseBody) {
             if (responseBody.isMember("error"))
             {
-                auto error = responseBody.get("error", {});
-                auto type = error.get("type", {}).asString();
-                auto reason = error.get("reason", {}).asString();
+                auto error = responseBody["error"];
+                auto type = error["type"].asString();
+                auto reason = error["reason"].asString();
                 string errorMessage = "ElasticSearchException [type=";
                 errorMessage += type;
                 errorMessage += ", reason=";
