@@ -77,12 +77,13 @@ TEST(CreateIndexTest, Test3)
     client.sendRequest("/c3_index_name", drogon::Delete);
 }
 
-TEST(GetIndexTest, Test1) {
+TEST(GetIndexTest, Test1)
+{
     using namespace tl::elasticsearch;
     // create an index
     HttpClient client("http://192.168.85.143:9200");
     client.sendRequest("/g1_index_name", drogon::Put);
-    
+
     // mainTest
     IndicesClient indicesClient(std::make_shared<HttpClient>(client));
     auto resp = indicesClient.get("g1_index_name");
@@ -96,18 +97,20 @@ TEST(GetIndexTest, Test1) {
     client.sendRequest("/g1_index_name", drogon::Delete);
 }
 
-TEST(GetIndexTest, Test2) {
+TEST(GetIndexTest, Test2)
+{
     using namespace tl::elasticsearch;
     // delete an index
     HttpClient client("http://192.168.85.143:9200");
     client.sendRequest("/g2_index_name", drogon::Delete);
-    
+
     // mainTest
     IndicesClient indicesClient(std::make_shared<HttpClient>(client));
     EXPECT_THROW(indicesClient.get("g2_index_name"), ElasticSearchException);
 }
 
-TEST(GetIndexTest, Test3) {
+TEST(GetIndexTest, Test3)
+{
     using namespace tl::elasticsearch;
     // create an index
     HttpClient client("http://192.168.85.143:9200");
@@ -146,6 +149,8 @@ TEST(GetIndexTest, Test3) {
     auto settings = resp->getSettings();
     EXPECT_EQ(5, settings->getNumberOfShards());
     EXPECT_EQ(1, settings->getNumberOfReplicas());
+    EXPECT_TRUE(settings->getCreationDate() <= trantor::Date::now());
+    EXPECT_STREQ("g3_index_name", settings->getProvidedName().c_str());
 
     // delete an index
     client.sendRequest("/g3_index_name", drogon::Delete);
