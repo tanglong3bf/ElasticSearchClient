@@ -115,6 +115,7 @@ void UpdateResponse::setByJson(const Json::Value &json)
     }
     if (json.isMember("_shards"))
     {
+        shards_ = std::make_shared<Shards>();
         shards_->setByJson(json["_shards"]);
     }
     if (json.isMember("_type"))
@@ -393,8 +394,20 @@ void DocumentsClient::get(
         [resultCallback = std::move(resultCallback),
          exceptionCallback =
              std::move(exceptionCallback)](const Json::Value &responseBody) {
-            if (responseBody.isMember("result") &&
-                responseBody["result"].asString() == "not_found")
+            if (responseBody.isMember("error"))
+            {
+                auto error = responseBody.get("error", {});
+                auto type = error.get("type", {}).asString();
+                auto reason = error.get("reason", {}).asString();
+                string errorMessage = "ElasticSearchException [type=";
+                errorMessage += type;
+                errorMessage += ", reason=";
+                errorMessage += reason;
+                errorMessage += "]";
+                exceptionCallback(ElasticSearchException(errorMessage));
+            }
+            else if (responseBody.isMember("result") &&
+                     responseBody["result"].asString() == "not_found")
             {
                 string errorMessage =
                     "ElasticSearchException [Get document failed. Because "

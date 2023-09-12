@@ -76,5 +76,5 @@ void HttpClient::sendRequest(
                 resultCallback(*responseBody);
             }
         },
-        1);
+        5);
 }
