@@ -5,6 +5,7 @@
 #include "unittests/HttpClientTest.h"
 #include "unittests/PropertyTest.h"
 #include "unittests/IndicesClientTest.h"
+#include "unittests/DocumentsClientTest.h"
 
 using namespace drogon;
 

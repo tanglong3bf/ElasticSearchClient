@@ -7,17 +7,17 @@ using namespace tl::elasticsearch;
 
 void Shards::setByJson(const Json::Value &json)
 {
-    if (json.isMember("_failed"))
+    if (json.isMember("failed"))
     {
-        failed_ = json["_failed"].asInt();
+        this->failed_ = json["failed"].asInt();
     }
-    if (json.isMember("_successful"))
+    if (json.isMember("successful"))
     {
-        successful_ = json["_successful"].asInt();
+        this->successful_ = json["successful"].asInt();
     }
-    if (json.isMember("_total"))
+    if (json.isMember("total"))
     {
-        total_ = json["_total"].asInt();
+        this->total_ = json["total"].asInt();
     }
 }
 
@@ -41,6 +41,7 @@ void IndexResponse::setByJson(const Json::Value &json)
     }
     if (json.isMember("_shards"))
     {
+        shards_ = make_shared<Shards>();
         shards_->setByJson(json["_shards"]);
     }
     if (json.isMember("_type"))
