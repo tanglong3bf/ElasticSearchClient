@@ -178,7 +178,7 @@ TEST(DocumentsClientTest, Get2)
     HttpClient httpClient("http://192.168.85.143:9200");
     DocumentsClient dClient(std::make_shared<HttpClient>(httpClient));
     // prepare
-    httpClient.sendRequest("/dg2_index_name", drogon::Post);
+    httpClient.sendRequest("/dg2_index_name", drogon::Put);
 
     GetParam param("dg2_index_name");
     param.setId("1");
@@ -193,7 +193,7 @@ TEST(DocumentsClientTest, Get3)
     HttpClient httpClient("http://192.168.85.143:9200");
     DocumentsClient dClient(std::make_shared<HttpClient>(httpClient));
     // prepare
-    httpClient.sendRequest("/dg3_index_name", drogon::Post);
+    httpClient.sendRequest("/dg3_index_name", drogon::Put);
     Json::Value json;
     json["title"] = "title";
     httpClient.sendRequest("/dg3_index_name/_doc/1", drogon::Post, json);

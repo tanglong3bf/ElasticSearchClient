@@ -406,8 +406,8 @@ void DocumentsClient::get(
                 errorMessage += "]";
                 exceptionCallback(ElasticSearchException(errorMessage));
             }
-            else if (responseBody.isMember("result") &&
-                     responseBody["result"].asString() == "not_found")
+            else if (responseBody.isMember("found") &&
+                     !responseBody["found"].asBool())
             {
                 string errorMessage =
                     "ElasticSearchException [Get document failed. Because "
