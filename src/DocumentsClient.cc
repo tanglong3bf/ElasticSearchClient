@@ -78,6 +78,7 @@ void DeleteResponse::setByJson(const Json::Value &json)
     }
     if (json.isMember("_shards"))
     {
+        shards_ = std::make_shared<Shards>();
         shards_->setByJson(json["_shards"]);
     }
     if (json.isMember("_type"))
@@ -254,8 +255,21 @@ void DocumentsClient::deleteDocument(
         [resultCallback = std::move(resultCallback),
          exceptionCallback =
              std::move(exceptionCallback)](const Json::Value &responseBody) {
-            if (responseBody.isMember("result") &&
-                responseBody["result"].asString() == "not_found")
+            // index is not exist
+            if (responseBody.isMember("error"))
+            {
+                auto error = responseBody["error"];
+                auto type = error["type"].asString();
+                auto reason = error["reason"].asString();
+                string errorMessage = "ElasticSearchException [type=";
+                errorMessage += type;
+                errorMessage += ", reason=";
+                errorMessage += reason;
+                errorMessage += "]";
+                exceptionCallback(ElasticSearchException(errorMessage));
+            }
+            else if (responseBody.isMember("result") &&
+                     responseBody["result"].asString() == "not_found")
             {
                 string errorMessage =
                     "ElasticSearchException [Delete document failed. Because "
