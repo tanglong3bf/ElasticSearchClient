@@ -9,22 +9,28 @@
 #include <exception>
 #include <string>
 
-namespace tl::elasticsearch {
-class ElasticSearchException : public std::exception {
-public:
+namespace tl::elasticsearch
+{
+class ElasticSearchException : public std::exception
+{
+  public:
     const char *what() const noexcept override
     {
         return message_.data();
     }
-    ElasticSearchException(const std::string &message)
-        : message_(message)
-    {}
-    ElasticSearchException(std::string &message)
-        : message_(std::move(message))
-    {}
+
+    ElasticSearchException(const std::string &message) : message_(message)
+    {
+    }
+
+    ElasticSearchException(std::string &message) : message_(std::move(message))
+    {
+    }
+
     ElasticSearchException() = delete;
-private:
+
+  private:
     std::string message_;
 };
 
-};
+};  // namespace tl::elasticsearch

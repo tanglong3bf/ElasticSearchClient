@@ -6,15 +6,17 @@
 
 #pragma once
 
-#include <string>
-#include <stdexcept>
-#include <memory>
-#include <trantor/utils/Logger.h>
 #include "ElasticSearchException.h"
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <trantor/utils/Logger.h>
 
-namespace tl::elasticsearch {
+namespace tl::elasticsearch
+{
 
-enum PropertyType {
+enum PropertyType
+{
     NONE,
     TEXT,
     KEYWORD,
@@ -28,68 +30,92 @@ enum PropertyType {
     DATE,
 };
 
-inline std::string to_string(const PropertyType &propertyType) {
-    if (propertyType == NONE) {
-        return "none";
+inline std::string_view to_string_view(const PropertyType &propertyType)
+{
+    switch (propertyType)
+    {
+        case NONE:
+            return "none";
+        case TEXT:
+            return "text";
+        case KEYWORD:
+            return "keyword";
+        case LONG:
+            return "long";
+        case INTEGER:
+            return "integer";
+        case SHORT:
+            return "short";
+        case BYTE:
+            return "byte";
+        case DOUBLE:
+            return "double";
+        case FLOAT:
+            return "float";
+        case BOOLEAN:
+            return "boolean";
+        case DATE:
+            return "date";
+        default:
+            throw tl::elasticsearch::ElasticSearchException("unkown type");
     }
-    if (propertyType == TEXT) {
-        return "text";
-    }
-    if (propertyType == KEYWORD) {
-        return "keyword";
-    }
-    if (propertyType == LONG) {
-        return "long";
-    }
-    if (propertyType == INTEGER) {
-        return "integer";
-    }
-    if (propertyType == SHORT) {
-        return "short";
-    }
-    if (propertyType == BYTE) {
-        return "byte";
-    }
-    if (propertyType == DOUBLE) {
-        return "double";
-    }
-    if (propertyType == FLOAT) {
-        return "float";
-    }
-    if (propertyType == BOOLEAN) {
-        return "boolean";
-    }
-    if (propertyType == DATE) {
-        return "date";
-    }
-    throw std::runtime_error("unkown type");
 }
 
-inline PropertyType string2PropertyType(const std::string &str) {
+inline std::string to_string(const PropertyType &propertyType)
+{
+    auto sv = to_string_view(propertyType);
+    return std::string(sv.data(), sv.size());
+}
+
+inline PropertyType string_to_property_type(const std::string &str)
+{
     PropertyType result;
-    if (str == "text") {
+    if (str == "text")
+    {
         result = TEXT;
-    } else if (str == "keyword") {
+    }
+    else if (str == "keyword")
+    {
         result = KEYWORD;
-    } else if (str == "long") {
+    }
+    else if (str == "long")
+    {
         result = LONG;
-    } else if (str == "integer") {
+    }
+    else if (str == "integer")
+    {
         result = INTEGER;
-    } else if (str == "short") {
+    }
+    else if (str == "short")
+    {
         result = SHORT;
-    } else if (str == "byte") {
+    }
+    else if (str == "byte")
+    {
         result = BYTE;
-    } else if (str == "double") {
+    }
+    else if (str == "double")
+    {
         result = DOUBLE;
-    } else if (str == "float") {
+    }
+    else if (str == "float")
+    {
         result = FLOAT;
-    } else if (str == "boolean") {
+    }
+    else if (str == "boolean")
+    {
         result = BOOLEAN;
-    } else if (str == "date") {
+    }
+    else if (str == "date")
+    {
         result = DATE;
-    } else if (str == "none") {
+    }
+    else if (str == "none")
+    {
         result = NONE;
-    } else {
+    }
+    else
+    {
         std::string error_message = "error property type: ";
         error_message += str;
         throw tl::elasticsearch::ElasticSearchException(error_message);
@@ -97,47 +123,46 @@ inline PropertyType string2PropertyType(const std::string &str) {
     return std::move(result);
 }
 
-class Property {
+class Property
+{
     // friend class CreateIndexParam;
-public:
-    Property(
-        const std::string &property_name,
-        bool index = false
-    )
-        : property_name_(property_name),
-        type_(NONE),
-        index_(index)
-    {}
-    Property(
-        const std::string &property_name,
-        PropertyType type,
-        bool index = true
-    )
-        : property_name_(property_name),
-        type_(type),
-        index_(index)
+  public:
+    Property(const std::string &property_name, bool index = false)
+        : property_name_(property_name), type_(NONE), index_(index)
     {
-        if (type == TEXT) {
+    }
+
+    Property(const std::string &property_name,
+             PropertyType type,
+             bool index = true)
+        : property_name_(property_name), type_(type), index_(index)
+    {
+        if (type == TEXT)
+        {
             analyzer_ = "standard";
         }
     }
-    Property(
-        const std::string &property_name,
-        PropertyType type,
-        const std::string &analyzer,
-        bool index = true
-    )
+
+    Property(const std::string &property_name,
+             PropertyType type,
+             const char *analyzer,
+             bool index = true)
         : property_name_(property_name),
-        type_(type),
-        analyzer_(analyzer),
-        index_(index)
+          type_(type),
+          analyzer_(analyzer),
+          index_(index)
     {
-        if (type != TEXT) {
-            LOG_WARN << "type of " << to_string(type) << " not need analyzer but set.";
+        if (type != TEXT)
+        {
+            LOG_WARN << "type of " << to_string(type)
+                     << " not need analyzer but set.";
         }
     }
-    Property &addSubProperty(const Property &subProperty) {
-        if (type_ != NONE) {
+
+    Property &addSubProperty(const Property &subProperty)
+    {
+        if (type_ != NONE)
+        {
             std::string error_message = "Property of ";
             error_message += to_string(type_);
             error_message += " CANNOT have children.";
@@ -146,23 +171,34 @@ public:
         properties_.push_back(subProperty);
         return *this;
     }
-public:
-    const std::string &getPropertyName() const {
+
+  public:
+    const std::string &getPropertyName() const
+    {
         return property_name_;
     }
-    const PropertyType &getType() const {
+
+    const PropertyType &getType() const
+    {
         return type_;
     }
-    bool getIndex() const {
+
+    bool getIndex() const
+    {
         return index_;
     }
-    const std::string &getAnalyzer() const {
+
+    const std::string &getAnalyzer() const
+    {
         return analyzer_;
     }
-    const std::vector<Property> &getProperties() const {
+
+    const std::vector<Property> &getProperties() const
+    {
         return properties_;
     }
-private:
+
+  private:
     std::string property_name_;
     PropertyType type_ = NONE;
     bool index_;
@@ -172,4 +208,4 @@ private:
 
 using PropertyPtr = std::shared_ptr<Property>;
 
-};
+};  // namespace tl::elasticsearch
