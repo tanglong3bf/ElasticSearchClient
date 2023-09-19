@@ -6,6 +6,7 @@
 #include "unittests/PropertyTest.h"
 #include "unittests/IndicesClientTest.h"
 #include "unittests/DocumentsClientTest.h"
+#include "unittests/SearchTest.h"
 
 using namespace drogon;
 

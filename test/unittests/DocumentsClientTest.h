@@ -4,7 +4,7 @@
 
 struct Blog : public tl::elasticsearch::Document
 {
-    virtual Json::Value toJson() const
+    virtual Json::Value toJson() const override
     {
         Json::Value result;
         result["title"] = "title";
@@ -12,12 +12,15 @@ struct Blog : public tl::elasticsearch::Document
         result["view"] = 233;
         return result;
     }
+    virtual void setByJson(const Json::Value&) override
+    {
+    }
 };
 
 TEST(DocumentsClientTest, Index1)
 {
     using namespace tl::elasticsearch;
-    HttpClient httpClient("http://192.168.85.143:9200");
+    HttpClient httpClient("http://localhost:9200");
     DocumentsClient dClient(std::make_shared<HttpClient>(httpClient));
 
     // mainTest
@@ -27,8 +30,8 @@ TEST(DocumentsClientTest, Index1)
     EXPECT_STREQ("1", resp->getId().c_str());
     EXPECT_STREQ("di1_index_name", resp->getIndex().c_str());
     EXPECT_STREQ("_doc", resp->getType().c_str());
-    // EXPECT_STREQ("created", resp->getResult().c_str());
-    // EXPECT_EQ(0, resp->getShards()->getFailed());
+    EXPECT_STREQ("created", resp->getResult().c_str());
+    EXPECT_EQ(0, resp->getShards()->getFailed());
 
     IndicesClient iClient(std::make_shared<HttpClient>(httpClient));
     iClient.deleteIndex("di1_index_name");
@@ -37,7 +40,7 @@ TEST(DocumentsClientTest, Index1)
 TEST(DocumentsClientTest, Index2)
 {
     using namespace tl::elasticsearch;
-    HttpClient httpClient("http://192.168.85.143:9200");
+    HttpClient httpClient("http://localhost:9200");
     DocumentsClient dClient(std::make_shared<HttpClient>(httpClient));
 
     // prepare
@@ -57,7 +60,7 @@ TEST(DocumentsClientTest, Index2)
 TEST(DocumentsClientTest, DeleteDocument1)
 {
     using namespace tl::elasticsearch;
-    HttpClient httpClient("http://192.168.85.143:9200");
+    HttpClient httpClient("http://localhost:9200");
     DocumentsClient dClient(std::make_shared<HttpClient>(httpClient));
     // prepare
     httpClient.sendRequest("/dd1_index_name", drogon::Delete);
@@ -70,7 +73,7 @@ TEST(DocumentsClientTest, DeleteDocument1)
 TEST(DocumentsClientTest, DeleteDocument2)
 {
     using namespace tl::elasticsearch;
-    HttpClient httpClient("http://192.168.85.143:9200");
+    HttpClient httpClient("http://localhost:9200");
     DocumentsClient dClient(std::make_shared<HttpClient>(httpClient));
     // prepare
     httpClient.sendRequest("/dd2_index_name", drogon::Put);
@@ -85,7 +88,7 @@ TEST(DocumentsClientTest, DeleteDocument2)
 TEST(DocumentsClientTest, DeleteDocument3)
 {
     using namespace tl::elasticsearch;
-    HttpClient httpClient("http://192.168.85.143:9200");
+    HttpClient httpClient("http://localhost:9200");
     DocumentsClient dClient(std::make_shared<HttpClient>(httpClient));
     // prepare
     httpClient.sendRequest("/dd3_index_name", drogon::Put);
@@ -107,7 +110,7 @@ TEST(DocumentsClientTest, DeleteDocument3)
 TEST(DocumentsClientTest, Update1)
 {
     using namespace tl::elasticsearch;
-    HttpClient httpClient("http://192.168.85.143:9200");
+    HttpClient httpClient("http://localhost:9200");
     DocumentsClient dClient(std::make_shared<HttpClient>(httpClient));
     // prepare
     httpClient.sendRequest("/du1_index_name", drogon::Delete);
@@ -123,7 +126,7 @@ TEST(DocumentsClientTest, Update1)
 TEST(DocumentsClientTest, Update2)
 {
     using namespace tl::elasticsearch;
-    HttpClient httpClient("http://192.168.85.143:9200");
+    HttpClient httpClient("http://localhost:9200");
     DocumentsClient dClient(std::make_shared<HttpClient>(httpClient));
     // prepare
     httpClient.sendRequest("/du2_index_name", drogon::Post);
@@ -139,7 +142,7 @@ TEST(DocumentsClientTest, Update2)
 TEST(DocumentsClientTest, Update3)
 {
     using namespace tl::elasticsearch;
-    HttpClient httpClient("http://192.168.85.143:9200");
+    HttpClient httpClient("http://localhost:9200");
     DocumentsClient dClient(std::make_shared<HttpClient>(httpClient));
     // prepare
     httpClient.sendRequest("/du3_index_name", drogon::Post);
@@ -162,7 +165,7 @@ TEST(DocumentsClientTest, Update3)
 TEST(DocumentsClientTest, Get1)
 {
     using namespace tl::elasticsearch;
-    HttpClient httpClient("http://192.168.85.143:9200");
+    HttpClient httpClient("http://localhost:9200");
     DocumentsClient dClient(std::make_shared<HttpClient>(httpClient));
     // prepare
     httpClient.sendRequest("/dg1_index_name", drogon::Delete);
@@ -175,7 +178,7 @@ TEST(DocumentsClientTest, Get1)
 TEST(DocumentsClientTest, Get2)
 {
     using namespace tl::elasticsearch;
-    HttpClient httpClient("http://192.168.85.143:9200");
+    HttpClient httpClient("http://localhost:9200");
     DocumentsClient dClient(std::make_shared<HttpClient>(httpClient));
     // prepare
     httpClient.sendRequest("/dg2_index_name", drogon::Put);
@@ -190,7 +193,7 @@ TEST(DocumentsClientTest, Get2)
 TEST(DocumentsClientTest, Get3)
 {
     using namespace tl::elasticsearch;
-    HttpClient httpClient("http://192.168.85.143:9200");
+    HttpClient httpClient("http://localhost:9200");
     DocumentsClient dClient(std::make_shared<HttpClient>(httpClient));
     // prepare
     httpClient.sendRequest("/dg3_index_name", drogon::Put);

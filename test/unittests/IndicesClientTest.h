@@ -23,7 +23,7 @@ TEST(CreateIndexTest, Test1)
 {
     using namespace tl::elasticsearch;
     // create an index
-    HttpClient client("http://192.168.85.143:9200");
+    HttpClient client("http://localhost:9200");
     client.sendRequest("/c1_index_name", drogon::Put);
 
     // mainTest
@@ -38,7 +38,7 @@ TEST(CreateIndexTest, Test2)
 {
     using namespace tl::elasticsearch;
     // delete an index
-    HttpClient client("http://192.168.85.143:9200");
+    HttpClient client("http://localhost:9200");
     client.sendRequest("/c2_index_name", drogon::Delete);
 
     // mainTest
@@ -56,17 +56,17 @@ TEST(CreateIndexTest, Test3)
 {
     using namespace tl::elasticsearch;
     // delete an index
-    HttpClient client("http://192.168.85.143:9200");
+    HttpClient client("http://localhost:9200");
     client.sendRequest("/c3_index_name", drogon::Delete);
 
     // mainTest
     IndicesClient indicesClient(std::make_shared<HttpClient>(client));
     CreateIndexParam param;
-    param.addProperty(Property("info", TEXT, "ik_smart"));
+    param.addProperty(Property("info", TEXT, "standard"));
     param.addProperty(Property("email", KEYWORD, false));
     param.addProperty(
         Property("name")
-            .addSubProperty(Property("firstName", TEXT, "ik_smart", false))
+            .addSubProperty(Property("firstName", TEXT, "standard", false))
             .addSubProperty(Property("lastName", KEYWORD, true)));
     auto resp = indicesClient.create("c3_index_name", param);
     EXPECT_TRUE(resp->isAcknowledged());
@@ -81,7 +81,7 @@ TEST(GetIndexTest, Test1)
 {
     using namespace tl::elasticsearch;
     // create an index
-    HttpClient client("http://192.168.85.143:9200");
+    HttpClient client("http://localhost:9200");
     client.sendRequest("/g1_index_name", drogon::Put);
 
     // mainTest
@@ -101,7 +101,7 @@ TEST(GetIndexTest, Test2)
 {
     using namespace tl::elasticsearch;
     // delete an index
-    HttpClient client("http://192.168.85.143:9200");
+    HttpClient client("http://localhost:9200");
     client.sendRequest("/g2_index_name", drogon::Delete);
 
     // mainTest
@@ -113,14 +113,14 @@ TEST(GetIndexTest, Test3)
 {
     using namespace tl::elasticsearch;
     // create an index
-    HttpClient client("http://192.168.85.143:9200");
+    HttpClient client("http://localhost:9200");
     IndicesClient indicesClient(std::make_shared<HttpClient>(client));
     CreateIndexParam param;
-    param.addProperty(Property("info", TEXT, "ik_smart"));
+    param.addProperty(Property("info", TEXT, "standard"));
     param.addProperty(Property("email", KEYWORD, false));
     param.addProperty(
         Property("name")
-            .addSubProperty(Property("firstName", TEXT, "ik_smart", false))
+            .addSubProperty(Property("firstName", TEXT, "standard", false))
             .addSubProperty(Property("lastName", KEYWORD, true)));
     indicesClient.create("g3_index_name", param);
 
@@ -139,7 +139,7 @@ TEST(GetIndexTest, Test3)
     EXPECT_EQ("info", properties[1].getPropertyName());
     EXPECT_EQ(TEXT, properties[1].getType());
     EXPECT_TRUE(properties[1].getIndex());
-    EXPECT_STREQ("ik_smart", properties[1].getAnalyzer().c_str());
+    EXPECT_STREQ("standard", properties[1].getAnalyzer().c_str());
     EXPECT_EQ(0, properties[1].getProperties().size());
 
     EXPECT_EQ("name", properties[2].getPropertyName());
@@ -159,13 +159,13 @@ TEST(GetIndexTest, Test3)
 TEST(PutMappingTest, Test1)
 {
     using namespace tl::elasticsearch;
-    HttpClient client("http://192.168.85.143:9200");
+    HttpClient client("http://localhost:9200");
     client.sendRequest("/p1_index_name", drogon::Delete);
 
     // mainTest
     IndicesClient indicesClient(std::make_shared<HttpClient>(client));
     PutMappingParam param;
-    param.addProperty({"title", TEXT, "ik_smart"});
+    param.addProperty({"title", TEXT, "standard"});
     EXPECT_THROW(indicesClient.putMapping("p1_index_name", param),
                  ElasticSearchException);
 }
@@ -174,13 +174,13 @@ TEST(PutMappingTest, Test2)
 {
     using namespace tl::elasticsearch;
     // create an index
-    HttpClient client("http://192.168.85.143:9200");
+    HttpClient client("http://localhost:9200");
     client.sendRequest("/p2_index_name", drogon::Put);
 
     // mainTest
     IndicesClient indicesClient(std::make_shared<HttpClient>(client));
     PutMappingParam param;
-    param.addProperty({"title", TEXT, "ik_smart"});
+    param.addProperty({"title", TEXT, "standard"});
     auto resp = indicesClient.putMapping("p2_index_name", param);
 
     EXPECT_TRUE(resp->isAcknowledged());
@@ -193,7 +193,7 @@ TEST(PutMappingTest, Test3)
 {
     using namespace tl::elasticsearch;
     // create an index
-    HttpClient client("http://192.168.85.143:9200");
+    HttpClient client("http://localhost:9200");
     client.sendRequest("/p3_index_name", drogon::Put);
 
     // mainTest
@@ -201,7 +201,7 @@ TEST(PutMappingTest, Test3)
     PutMappingParam param;
     param
         .addProperty(Property("name")
-                         .addSubProperty({"firstName", TEXT, "ik_smart"})
+                         .addSubProperty({"firstName", TEXT, "standard"})
                          .addSubProperty({"lastName", KEYWORD, false}))
         .addProperty({"age", INTEGER, false});
     auto resp = indicesClient.putMapping("p3_index_name", param);
@@ -215,7 +215,7 @@ TEST(PutMappingTest, Test3)
 TEST(DeleteIndexTest, Test1) {
     using namespace tl::elasticsearch;
     // delete an index
-    HttpClient client("http://192.168.85.143:9200");
+    HttpClient client("http://localhost:9200");
     client.sendRequest("/d1_index_name", drogon::Delete);
 
     // mainTest
@@ -226,7 +226,7 @@ TEST(DeleteIndexTest, Test1) {
 TEST(DeleteIndexTest, Test2) {
     using namespace tl::elasticsearch;
     // delete an index
-    HttpClient client("http://192.168.85.143:9200");
+    HttpClient client("http://localhost:9200");
     client.sendRequest("/d2_index_name", drogon::Put);
 
     // mainTest

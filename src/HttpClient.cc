@@ -5,7 +5,6 @@
  */
 
 #include "HttpClient.h"
-#include <iostream>
 
 using namespace std;
 using namespace tl::elasticsearch;
