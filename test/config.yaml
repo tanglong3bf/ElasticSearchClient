@@ -6,6 +6,3 @@ app:
 # plugins: Define all plugins running in the application
 plugins:
   - name: 'tl::elasticsearch::ElasticSearchClient' 
-    config:
-      host: "192.168.85.143"
-      port: 9200

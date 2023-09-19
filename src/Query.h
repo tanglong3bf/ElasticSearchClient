@@ -2,7 +2,11 @@
 
 #include <forward_list>
 #include <json/value.h>
-#include <stdexcept>
+#include <trantor/utils/Logger.h>
+#include "ElasticSearchException.h"
+
+namespace tl::elasticsearch
+{
 
 class Query
 {
@@ -14,7 +18,19 @@ using QueryPtr = std::shared_ptr<Query>;
 
 class MatchAllQuery : public Query
 {
+  private:
+    MatchAllQuery() = default;
+
   public:
+    class Builder
+    {
+      public:
+        QueryPtr operator()()
+        {
+            return std::shared_ptr<MatchAllQuery>(new MatchAllQuery());
+        }
+    };
+
     Json::Value toJson() const
     {
         Json::Value json;
@@ -26,11 +42,35 @@ class MatchAllQuery : public Query
 
 class MatchQuery : public Query
 {
-  public:
+  private:
     MatchQuery(std::string field, std::string query)
         : field_(field), query_(query)
     {
     }
+
+  public:
+    class Builder
+    {
+      public:
+        Builder &field(std::string field)
+        {
+            field_ = field;
+            return *this;
+        }
+        Builder &query(std::string query)
+        {
+            query_ = query;
+            return *this;
+        }
+        QueryPtr operator()()
+        {
+            return std::shared_ptr<MatchQuery>(new MatchQuery(field_, query_));
+        }
+
+      private:
+        std::string field_;
+        std::string query_;
+    };
 
     Json::Value toJson() const
     {
@@ -46,17 +86,54 @@ class MatchQuery : public Query
 
 class MultiMatchQuery : public Query
 {
-  public:
+  private:
     MultiMatchQuery(std::string query, std::vector<std::string> fields)
         : query_(query), fields_(fields)
     {
     }
 
+  public:
+    class Builder
+    {
+      public:
+        Builder &fields(std::vector<std::string> fields)
+        {
+            fields_ = fields;
+            return *this;
+        }
+        Builder &query(std::string query)
+        {
+            query_ = query;
+            return *this;
+        }
+        QueryPtr operator()()
+        {
+            auto size = fields_.size();
+            if (size == 0)
+            {
+                std::string errorMessage(
+                    "MultiMatchQuery must support fields.");
+                throw ElasticSearchException(errorMessage);
+            }
+            else if (size == 1)
+            {
+                LOG_WARN << "Only one field is provided. It is recommended to "
+                            "use MatchQuery";
+            }
+            return std::shared_ptr<MultiMatchQuery>(
+                new MultiMatchQuery(query_, fields_));
+        }
+
+      private:
+        std::vector<std::string> fields_;
+        std::string query_;
+    };
+
     Json::Value toJson() const
     {
         Json::Value json;
         json["multi_match"]["query"] = query_;
-        for (const auto &field : fields_)
+        for (std::string field : fields_)
         {
             json["multi_match"]["fields"].append(field);
         }
@@ -70,11 +147,35 @@ class MultiMatchQuery : public Query
 
 class TermQuery : public Query
 {
-  public:
+  private:
     TermQuery(std::string field, std::string query)
         : field_(field), query_(query)
     {
     }
+
+  public:
+    class Builder
+    {
+      public:
+        Builder &field(std::string field)
+        {
+            field_ = field;
+            return *this;
+        }
+        Builder &query(std::string query)
+        {
+            query_ = query;
+            return *this;
+        }
+        QueryPtr operator()()
+        {
+            return std::shared_ptr<TermQuery>(new TermQuery(field_, query_));
+        }
+
+      private:
+        std::string field_;
+        std::string query_;
+    };
 
     Json::Value toJson() const
     {
@@ -90,30 +191,172 @@ class TermQuery : public Query
 
 class RangeQuery : public Query
 {
-  public:
-    RangeQuery(std::string field, double gte, double lte)
-        : field_(field), gte_(gte), lte_(lte)
+  private:
+    RangeQuery(std::string field) : field_(field)
     {
     }
+    RangeQuery &gt(double gt)
+    {
+        gt_ = std::make_shared<double>(gt);
+        return *this;
+    }
+    RangeQuery &lt(double lt)
+    {
+        lt_ = std::make_shared<double>(lt);
+        return *this;
+    }
+    RangeQuery &gte(double gte)
+    {
+        gte_ = std::make_shared<double>(gte);
+        return *this;
+    }
+    RangeQuery &lte(double lte)
+    {
+        lte_ = std::make_shared<double>(lte);
+        return *this;
+    }
+
+  public:
+    class Builder
+    {
+      public:
+        Builder &field(std::string field)
+        {
+            field_ = field;
+            return *this;
+        }
+        Builder &gt(double gt)
+        {
+            gt_ = std::make_shared<double>(gt);
+            return *this;
+        }
+        Builder &lt(double lt)
+        {
+            lt_ = std::make_shared<double>(lt);
+            return *this;
+        }
+        Builder &gte(double gte)
+        {
+            gte_ = std::make_shared<double>(gte);
+            return *this;
+        }
+        Builder &lte(double lte)
+        {
+            lte_ = std::make_shared<double>(lte);
+            return *this;
+        }
+        auto operator()()
+        {
+            if (lt_ && lte_)
+            {
+                throw ElasticSearchException(
+                    "Cannot set lt and lte at the same time.");
+            }
+            if (gt_ && gte_)
+            {
+                throw ElasticSearchException(
+                    "Cannot set gt and gte at the same time.");
+            }
+            auto query = std::shared_ptr<RangeQuery>(new RangeQuery(field_));
+            if (gte_)
+            {
+                if (lte_)
+                {
+                    if (*gte_ > *lte_)
+                    {
+                        throw ElasticSearchException(
+                            "Gte cannot be greater than lte.");
+                    }
+                    query->lte(*lte_);
+                }
+                else if (lt_)
+                {
+                    if (*gte_ >= *lt_)
+                    {
+                        throw ElasticSearchException(
+                            "Gte cannot be greater than or eaual to lt.");
+                    }
+                    query->lt(*lt_);
+                }
+                query->gte(*gte_);
+            }
+            else if (gt_)
+            {
+                if (lte_)
+                {
+                    if (*gt_ >= *lte_)
+                    {
+                        throw ElasticSearchException(
+                            "Gt cannot be greater than or equal to lte.");
+                    }
+                    query->lte(*lte_);
+                }
+                else if (lt_)
+                {
+                    if (*gt_ >= *lt_)
+                    {
+                        throw ElasticSearchException(
+                            "Gt cannot be greater than or equal to lt.");
+                    }
+                    query->lt(*lt_);
+                }
+                query->gt(*gt_);
+            }
+            else if (lte_)
+            {
+                query->lte(*lte_);
+            }
+            else if (lt_)
+            {
+                query->lt(*lt_);
+            }
+            else
+            {
+                throw ElasticSearchException(
+                    "Please set at least one condition.");
+            }
+            return query;
+        }
+
+      private:
+        std::string field_;
+        std::shared_ptr<double> gt_;
+        std::shared_ptr<double> lt_;
+        std::shared_ptr<double> gte_;
+        std::shared_ptr<double> lte_;
+    };
 
     Json::Value toJson() const
     {
-        if (gte_ > lte_)
-        {
-            throw std::runtime_error("gte_ is greater than lte_");
-        }
         Json::Value json;
-        json["range"][field_]["gte"] = gte_;
-        json["range"][field_]["lte"] = lte_;
+        if (gt_ != nullptr)
+        {
+            json["range"][field_]["gt"] = *gt_;
+        }
+        if (lt_ != nullptr)
+        {
+            json["range"][field_]["lt"] = *lt_;
+        }
+        if (gte_ != nullptr)
+        {
+            json["range"][field_]["gte"] = *gte_;
+        }
+        if (lte_ != nullptr)
+        {
+            json["range"][field_]["lte"] = *lte_;
+        }
         return json;
     }
 
   private:
     std::string field_;
-    double gte_;
-    double lte_;
+    std::shared_ptr<double> gt_;
+    std::shared_ptr<double> lt_;
+    std::shared_ptr<double> gte_;
+    std::shared_ptr<double> lte_;
 };
 
+#if 0  // Lack of test data, still need to be adjusted
 class GeoPoint
 {
   public:
@@ -136,48 +379,116 @@ class GeoPoint
 
 class GeoBoundingBoxQuery : public Query
 {
-  public:
-    GeoBoundingBoxQuery(GeoPoint topLeft, GeoPoint bottomRight)
-        : topLeft_(topLeft), bottomRight_(bottomRight)
+  private:
+    GeoBoundingBoxQuery(const std::string &field,
+                        std::shared_ptr<GeoPoint> topLeft,
+                        std::shared_ptr<GeoPoint> bottomRight)
+        : field_(field), topLeft_(topLeft), bottomRight_(bottomRight)
     {
     }
+
+  public:
+    class Builder
+    {
+      public:
+        Builder &field(const std::string &field)
+        {
+            field_ = field;
+            return *this;
+        }
+        Builder &topLeft(const GeoPoint &topLeft)
+        {
+            topLeft_ = std::make_shared<GeoPoint>(topLeft);
+            return *this;
+        }
+        Builder &bottomRight(const GeoPoint &bottomRight)
+        {
+            bottomRight_ = std::make_shared<GeoPoint>(bottomRight);
+            return *this;
+        }
+        QueryPtr operator()()
+        {
+            return std::shared_ptr<GeoBoundingBoxQuery>(
+                new GeoBoundingBoxQuery(field_, topLeft_, bottomRight_));
+        }
+
+      private:
+        std::string field_;
+        std::shared_ptr<GeoPoint> topLeft_;
+        std::shared_ptr<GeoPoint> bottomRight_;
+    };
 
     Json::Value toJson() const
     {
         Json::Value json;
-        json["geo_bounding_box"][field_]["top_left"] = topLeft_.toJson();
+        json["geo_bounding_box"][field_]["top_left"] = topLeft_->toJson();
         json["geo_bounding_box"][field_]["bottom_right"] =
-            bottomRight_.toJson();
+            bottomRight_->toJson();
         return json;
     }
 
   private:
     std::string field_;
-    GeoPoint topLeft_;
-    GeoPoint bottomRight_;
+    std::shared_ptr<GeoPoint> topLeft_;
+    std::shared_ptr<GeoPoint> bottomRight_;
 };
 
 class GeoDistanceQuery : public Query
 {
-  public:
-    GeoDistanceQuery(std::string field, std::string distance, GeoPoint pos)
+  private:
+    GeoDistanceQuery(std::string field,
+                     std::string distance,
+                     std::shared_ptr<GeoPoint> pos)
         : field_(field), distance_(distance), pos_(pos)
     {
     }
+
+  public:
+    class Builder
+    {
+      public:
+        Builder &field(std::string field)
+        {
+            field_ = field;
+            return *this;
+        }
+        Builder &distance(const std::string &distance)
+        {
+            distance_ = distance;
+            return *this;
+        }
+        Builder &pos(const GeoPoint &pos)
+        {
+            pos_ = std::make_shared<GeoPoint>(pos);
+            return *this;
+        }
+        QueryPtr operator()()
+        {
+            return std::shared_ptr<GeoDistanceQuery>(
+                new GeoDistanceQuery(field_, distance_, pos_));
+        }
+
+      private:
+        std::string field_;
+        std::string distance_;
+        std::shared_ptr<GeoPoint> pos_;
+    };
 
     Json::Value toJson() const
     {
         Json::Value json;
         json["geo_distance"]["distance"] = distance_;
-        json["geo_distance"][field_] = pos_.toJson();
+        json["geo_distance"][field_] = pos_->toJson();
         return json;
     }
 
   private:
     std::string field_;
     std::string distance_;
-    GeoPoint pos_;
+    std::shared_ptr<GeoPoint> pos_;
 };
+
+#endif
 
 // enum BoostMode {
 //     multiply,
@@ -247,32 +558,102 @@ class GeoDistanceQuery : public Query
 //     BoostMode boostMode_;
 // };
 
-class BoolQuery : Query
+class BoolQuery : public Query
 {
-  public:
-    BoolQuery must(QueryPtr &mustQuery)
+  private:
+    BoolQuery() = default;
+    BoolQuery &must(const QueryPtr &mustQuery)
     {
         must_.push_back(mustQuery);
         return *this;
     }
 
-    BoolQuery should(QueryPtr &shouldQuery)
+    BoolQuery &should(const QueryPtr &shouldQuery)
     {
         should_.push_back(shouldQuery);
         return *this;
     }
 
-    BoolQuery mustNot(QueryPtr &mustNotQuery)
+    BoolQuery &mustNot(const QueryPtr &mustNotQuery)
     {
         mustNot_.push_back(mustNotQuery);
         return *this;
     }
 
-    BoolQuery filter(QueryPtr &filterQuery)
+    BoolQuery &filter(const QueryPtr &filterQuery)
     {
         filter_.push_back(filterQuery);
         return *this;
     }
+
+  public:
+    class Builder
+    {
+      public:
+        Builder &must(const QueryPtr &mustQuery)
+        {
+            must_.push_back(mustQuery);
+            return *this;
+        }
+
+        Builder &should(const QueryPtr &shouldQuery)
+        {
+            should_.push_back(shouldQuery);
+            return *this;
+        }
+
+        Builder &mustNot(const QueryPtr &mustNotQuery)
+        {
+            mustNot_.push_back(mustNotQuery);
+            return *this;
+        }
+
+        Builder &filter(const QueryPtr &filterQuery)
+        {
+            filter_.push_back(filterQuery);
+            return *this;
+        }
+
+        QueryPtr operator()()
+        {
+            auto query = std::shared_ptr<BoolQuery>(new BoolQuery());
+            if (must_.size() > 0)
+            {
+                for (const auto &must : must_)
+                {
+                    query->must(must);
+                }
+            }
+            if (should_.size() > 0)
+            {
+                for (const auto &should : should_)
+                {
+                    query->should(should);
+                }
+            }
+            if (mustNot_.size() > 0)
+            {
+                for (const auto &mustNot : mustNot_)
+                {
+                    query->mustNot(mustNot);
+                }
+            }
+            if (filter_.size() > 0)
+            {
+                for (const auto &filter : filter_)
+                {
+                    query->filter(filter);
+                }
+            }
+            return query;
+        }
+
+      private:
+        std::vector<QueryPtr> must_;
+        std::vector<QueryPtr> should_;
+        std::vector<QueryPtr> mustNot_;
+        std::vector<QueryPtr> filter_;
+    };
 
     Json::Value toJson() const
     {
@@ -284,7 +665,7 @@ class BoolQuery : Query
             {
                 must.append(item->toJson());
             }
-            json["query"]["bool"]["must"] = must;
+            json["bool"]["must"] = must;
         }
         if (should_.size() > 0)
         {
@@ -293,7 +674,7 @@ class BoolQuery : Query
             {
                 should.append(item->toJson());
             }
-            json["query"]["bool"]["should"] = should;
+            json["bool"]["should"] = should;
         }
         if (mustNot_.size() > 0)
         {
@@ -302,7 +683,7 @@ class BoolQuery : Query
             {
                 mustNot.append(item->toJson());
             }
-            json["query"]["bool"]["mustNot"] = mustNot;
+            json["bool"]["mustNot"] = mustNot;
         }
         if (filter_.size() > 0)
         {
@@ -311,7 +692,7 @@ class BoolQuery : Query
             {
                 filter.append(item->toJson());
             }
-            json["query"]["bool"]["filter"] = filter;
+            json["bool"]["filter"] = filter;
         }
         return json;
     }
@@ -322,3 +703,5 @@ class BoolQuery : Query
     std::vector<QueryPtr> mustNot_;
     std::vector<QueryPtr> filter_;
 };
+
+};  // namespace tl::elasticsearch

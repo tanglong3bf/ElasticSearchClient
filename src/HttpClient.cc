@@ -5,7 +5,6 @@
  */
 
 #include "HttpClient.h"
-#include <iostream>
 
 using namespace std;
 using namespace tl::elasticsearch;
@@ -76,5 +75,5 @@ void HttpClient::sendRequest(
                 resultCallback(*responseBody);
             }
         },
-        1);
+        5);
 }

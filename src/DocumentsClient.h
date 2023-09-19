@@ -1,11 +1,11 @@
 #pragma once
 
-#include "ElasticSearchException.h"
-#include "HttpClient.h"
-#include "Query.h"
 #include <functional>
 #include <json/value.h>
 #include <memory>
+#include "ElasticSearchException.h"
+#include "HttpClient.h"
+#include "Query.h"
 
 namespace tl::elasticsearch
 {
@@ -14,7 +14,11 @@ class Document
 {
   public:
     virtual Json::Value toJson() const = 0;
+    virtual void setByJson(const Json::Value &) = 0;
 };
+
+template <typename Tp>
+concept isDocumentType = std::derived_from<Tp, Document>;
 
 class Shards
 {
@@ -358,7 +362,7 @@ class GetParam
 class SearchParam
 {
   public:
-    SearchParam(const std::string &index, const QueryPtr query)
+    SearchParam(const std::string &index, QueryPtr query)
         : index_(index), query_(query)
     {
     }
@@ -369,25 +373,155 @@ class SearchParam
         return index_;
     }
 
-    QueryPtr query() const
+    const QueryPtr query() const
     {
         return query_;
     }
 
   private:
     std::string index_;
-    QueryPtr query_;
+    const QueryPtr query_;
 };
 
+template <typename Tp>
+    requires isDocumentType<Tp>
+class Hit
+{
+  public:
+    void setByJson(const Json::Value &json)
+    {
+        if (json.isMember("_index") && json["_index"].isString())
+        {
+            index_ = json["_index"].asString();
+        }
+        if (json.isMember("_type") && json["_type"].isString())
+        {
+            type_ = json["_type"].asString();
+        }
+        if (json.isMember("_id") && json["_id"].isString())
+        {
+            id_ = json["_id"].asString();
+        }
+        if (json.isMember("_score") && json["_score"].isNumeric())
+        {
+            score_ = json["_score"].asDouble();
+        }
+        if (json.isMember("_source") && json["_source"].isObject())
+        {
+            source_ = std::make_shared<Tp>();
+            source_->setByJson(json["_source"]);
+        }
+    }
+    const std::string &getIndex() const
+    {
+        return index_;
+    }
+    const std::string &getType() const
+    {
+        return type_;
+    }
+    const std::string &getId() const
+    {
+        return id_;
+    }
+    double getScore() const
+    {
+        return score_;
+    }
+    const Tp &getSource() const
+    {
+        return *source_;
+    }
+
+  private:
+    std::string index_;
+    std::string type_;
+    std::string id_;
+    double score_;
+    std::shared_ptr<Tp> source_;
+};
+
+template <typename Tp>
+    requires isDocumentType<Tp>
 class SearchResponse
 {
   public:
     void setByJson(const Json::Value &json)
     {
+        if (json.isMember("took") && json["took"].isInt())
+        {
+            took_ = json["took"].asInt();
+        }
+        if (json.isMember("timed_out") && json["timed_out"].isBool())
+        {
+            timed_out_ = json["timed_out"].asBool();
+        }
+        if (json.isMember("_shards") && json["_shards"].isObject())
+        {
+            shards_ = std::make_shared<Shards>();
+            shards_->setByJson(json["_shards"]);
+        }
+        if (json.isMember("hits") && json["hits"].isObject())
+        {
+            auto hits = json["hits"];
+            if (hits.isMember("total") && hits["total"].isInt())
+            {
+                hits__total_ = hits["total"].asInt();
+            }
+            if (hits.isMember("max_score") && hits["max_score"].isNumeric())
+            {
+                hits__max_score_ = std::make_shared<double>();
+                *hits__max_score_ = hits["max_score"].asDouble();
+            }
+            if (hits.isMember("hits") && hits["hits"].isArray())
+            {
+                for (const auto &item : hits["hits"])
+                {
+                    Hit<Tp> hit;
+                    hit.setByJson(item);
+                    hits_.push_back(hit);
+                }
+            }
+        }
     }
+
+    auto getTook()
+    {
+        return took_;
+    }
+    auto getTimedOut()
+    {
+        return timed_out_;
+    }
+    auto getShards()
+    {
+        return shards_;
+    }
+    auto getHitsTotal()
+    {
+        return hits__total_;
+    }
+    auto getHitsMaxScore()
+    {
+        return hits__max_score_;
+    }
+    auto getHits()
+    {
+        return hits_;
+    }
+
+  private:
+    uint32_t took_;
+    bool timed_out_;
+    ShardsPtr shards_;
+    uint32_t hits__total_;
+    std::shared_ptr<double> hits__max_score_;
+    std::vector<Hit<Tp>> hits_;
 };
 
-using SearchResponsePtr = std::shared_ptr<SearchResponse>;
+template <typename Tp>
+    requires isDocumentType<Tp>
+using SearchResponsePtr = std::shared_ptr<SearchResponse<Tp>>;
 
 class DocumentsClient
 {
@@ -428,12 +562,76 @@ class DocumentsClient
                  &exceptionCallback) const;
 
     // search
-    SearchResponsePtr search(const SearchParam &param) const;
-    void search(
-        const SearchParam &param,
-        const std::function<void(const SearchResponsePtr &)> &resultCallback,
-        const std::function<void(const ElasticSearchException &)>
-            &exceptionCallback) const;
+    template <typename Tp>
+        requires isDocumentType<Tp>
+    SearchResponsePtr<Tp> search(const SearchParam &param) const
+    {
+        std::unique_ptr<std::promise<SearchResponsePtr<Tp>>> pro(
+            new std::promise<SearchResponsePtr<Tp>>);
+        auto f = pro->get_future();
+        this->search<Tp>(
+            param,
+            [&pro](const SearchResponsePtr<Tp> &response) {
+                try
+                {
+                    pro->set_value(response);
+                }
+                catch (...)
+                {
+                    pro->set_exception(std::current_exception());
+                }
+            },
+            [&pro](const ElasticSearchException &err) {
+                pro->set_exception(std::make_exception_ptr(err));
+            });
+        return f.get();
+    }
+
+    template <typename Tp>
+        requires isDocumentType<Tp>
+    void search(const SearchParam &param,
+                const std::function<void(const SearchResponsePtr<Tp> &)>
+                    &resultCallback,
+                const std::function<void(const ElasticSearchException &)>
+                    &exceptionCallback) const
+    {
+        std::string path = "/";
+        path += param.index();
+        path += "/_search";
+
+        Json::Value requestBody;
+        requestBody["query"] = param.query()->toJson();
+
+        httpClient_->sendRequest(
+            path,
+            drogon::Get,
+            [resultCallback = std::move(resultCallback),
+             exceptionCallback = std::move(exceptionCallback)](
+                const Json::Value &responseBody) {
+                if (responseBody.isMember("error") &&
+                    responseBody["error"].isObject())
+                {
+                    auto error = responseBody["error"];
+                    auto type = error["type"].asString();
+                    auto reason = error["reason"].asString();
+                    std::string errorMessage = "ElasticSearchException [type=";
+                    errorMessage += type;
+                    errorMessage += ", reason=";
+                    errorMessage += reason;
+                    errorMessage += "]";
+                    exceptionCallback(ElasticSearchException(errorMessage));
+                }
+                else
+                {
+                    SearchResponsePtr<Tp> s_result =
+                        std::make_shared<SearchResponse<Tp>>();
+                    s_result->setByJson(responseBody);
+                    resultCallback(s_result);
+                }
+            },
+            std::move(exceptionCallback),
+            requestBody);
+    }
 
   private:
     std::shared_ptr<HttpClient> httpClient_;

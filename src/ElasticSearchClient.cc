@@ -17,7 +17,6 @@ using namespace tl::elasticsearch;
 
 void ElasticSearchClient::initAndStart(const Json::Value &config)
 {
-    LOG_TRACE << "加载了插件";
     /// Initialize and start the plugin
     this->host_ = config.get("host", Json::Value("localhost")).asString();
     this->port_ = config.get("port", Json::Value(9200)).asUInt();

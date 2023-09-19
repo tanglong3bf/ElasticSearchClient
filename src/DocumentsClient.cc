@@ -7,17 +7,17 @@ using namespace tl::elasticsearch;
 
 void Shards::setByJson(const Json::Value &json)
 {
-    if (json.isMember("_failed"))
+    if (json.isMember("failed"))
     {
-        failed_ = json["_failed"].asInt();
+        this->failed_ = json["failed"].asInt();
     }
-    if (json.isMember("_successful"))
+    if (json.isMember("successful"))
     {
-        successful_ = json["_successful"].asInt();
+        this->successful_ = json["successful"].asInt();
     }
-    if (json.isMember("_total"))
+    if (json.isMember("total"))
     {
-        total_ = json["_total"].asInt();
+        this->total_ = json["total"].asInt();
     }
 }
 
@@ -41,6 +41,7 @@ void IndexResponse::setByJson(const Json::Value &json)
     }
     if (json.isMember("_shards"))
     {
+        shards_ = make_shared<Shards>();
         shards_->setByJson(json["_shards"]);
     }
     if (json.isMember("_type"))
@@ -77,6 +78,7 @@ void DeleteResponse::setByJson(const Json::Value &json)
     }
     if (json.isMember("_shards"))
     {
+        shards_ = std::make_shared<Shards>();
         shards_->setByJson(json["_shards"]);
     }
     if (json.isMember("_type"))
@@ -113,6 +115,7 @@ void UpdateResponse::setByJson(const Json::Value &json)
     }
     if (json.isMember("_shards"))
     {
+        shards_ = std::make_shared<Shards>();
         shards_->setByJson(json["_shards"]);
     }
     if (json.isMember("_type"))
@@ -253,8 +256,21 @@ void DocumentsClient::deleteDocument(
         [resultCallback = std::move(resultCallback),
          exceptionCallback =
              std::move(exceptionCallback)](const Json::Value &responseBody) {
-            if (responseBody.isMember("result") &&
-                responseBody["result"].asString() == "not_found")
+            // index is not exist
+            if (responseBody.isMember("error"))
+            {
+                auto error = responseBody["error"];
+                auto type = error["type"].asString();
+                auto reason = error["reason"].asString();
+                string errorMessage = "ElasticSearchException [type=";
+                errorMessage += type;
+                errorMessage += ", reason=";
+                errorMessage += reason;
+                errorMessage += "]";
+                exceptionCallback(ElasticSearchException(errorMessage));
+            }
+            else if (responseBody.isMember("result") &&
+                     responseBody["result"].asString() == "not_found")
             {
                 string errorMessage =
                     "ElasticSearchException [Delete document failed. Because "
@@ -378,8 +394,20 @@ void DocumentsClient::get(
         [resultCallback = std::move(resultCallback),
          exceptionCallback =
              std::move(exceptionCallback)](const Json::Value &responseBody) {
-            if (responseBody.isMember("result") &&
-                responseBody["result"].asString() == "not_found")
+            if (responseBody.isMember("error"))
+            {
+                auto error = responseBody.get("error", {});
+                auto type = error.get("type", {}).asString();
+                auto reason = error.get("reason", {}).asString();
+                string errorMessage = "ElasticSearchException [type=";
+                errorMessage += type;
+                errorMessage += ", reason=";
+                errorMessage += reason;
+                errorMessage += "]";
+                exceptionCallback(ElasticSearchException(errorMessage));
+            }
+            else if (responseBody.isMember("found") &&
+                     !responseBody["found"].asBool())
             {
                 string errorMessage =
                     "ElasticSearchException [Get document failed. Because "
@@ -394,64 +422,4 @@ void DocumentsClient::get(
             }
         },
         std::move(exceptionCallback));
-}
-
-SearchResponsePtr DocumentsClient::search(const SearchParam &param) const
-{
-    unique_ptr<promise<SearchResponsePtr>> pro(new promise<SearchResponsePtr>);
-    auto f = pro->get_future();
-    this->search(
-        param,
-        [&pro](const SearchResponsePtr &response) {
-            try
-            {
-                pro->set_value(response);
-            }
-            catch (...)
-            {
-                pro->set_exception(current_exception());
-            }
-        },
-        [&pro](const ElasticSearchException &err) {
-            pro->set_exception(make_exception_ptr(err));
-        });
-    return f.get();
-}
-
-void DocumentsClient::search(
-    const SearchParam &param,
-    const std::function<void(const SearchResponsePtr &)> &resultCallback,
-    const std::function<void(const ElasticSearchException &)>
-        &exceptionCallback) const
-{
-    std::string path = "/";
-    path += param.index();
-    path += "/_search";
-
-    Json::Value requestBody;
-    requestBody["query"] = param.query()->toJson();
-
-    httpClient_->sendRequest(
-        path,
-        drogon::Get,
-        [resultCallback = std::move(resultCallback),
-         exceptionCallback =
-             std::move(exceptionCallback)](const Json::Value &responseBody) {
-            if (responseBody.isMember("result") &&
-                responseBody["result"].asString() == "not_found")
-            {
-                string errorMessage =
-                    "ElasticSearchException [Get document failed. Because "
-                    "document is not_found.]";
-                exceptionCallback(ElasticSearchException(errorMessage));
-            }
-            else
-            {
-                SearchResponsePtr s_result = make_shared<SearchResponse>();
-                s_result->setByJson(responseBody);
-                resultCallback(s_result);
-            }
-        },
-        std::move(exceptionCallback),
-        requestBody);
 }

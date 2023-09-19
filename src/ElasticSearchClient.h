@@ -101,9 +101,11 @@ class ElasticSearchClient : public drogon::Plugin<ElasticSearchClient>
     }
 
     // operations of search
-    SearchResponsePtr search(const SearchParam &param) const
+    template <typename Tp>
+        requires isDocumentType<Tp>
+    SearchResponsePtr<Tp> search(const SearchParam &param) const
     {
-        return this->documents_->search(param);
+        return this->documents_->search<Tp>(param);
     }
 
   private:
