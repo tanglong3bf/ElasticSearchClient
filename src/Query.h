@@ -1,6 +1,6 @@
 #pragma once
 
-#include <forward_list>
+#include <memory>
 #include <json/value.h>
 #include <trantor/utils/Logger.h>
 #include "ElasticSearchException.h"
@@ -16,22 +16,19 @@ class Query
 
 using QueryPtr = std::shared_ptr<Query>;
 
-class MatchAllQuery : public Query
+class MatchAllQuery : public Query,
+                      public std::enable_shared_from_this<MatchAllQuery>
 {
   private:
     MatchAllQuery() = default;
 
   public:
-    class Builder
+    static auto newMatchAllQuery()
     {
-      public:
-        QueryPtr operator()()
-        {
-            return std::shared_ptr<MatchAllQuery>(new MatchAllQuery());
-        }
-    };
+        return std::shared_ptr<MatchAllQuery>(new MatchAllQuery());
+    }
 
-    Json::Value toJson() const
+    Json::Value toJson() const override
     {
         Json::Value json;
         json["match_all"]["a"] = 0;
@@ -40,39 +37,31 @@ class MatchAllQuery : public Query
     }
 };
 
-class MatchQuery : public Query
+class MatchQuery : public Query, public std::enable_shared_from_this<MatchQuery>
 {
   private:
-    MatchQuery(std::string field, std::string query)
-        : field_(field), query_(query)
+    MatchQuery()
     {
     }
 
   public:
-    class Builder
+    static auto newMatchQuery()
     {
-      public:
-        Builder &field(std::string field)
-        {
-            field_ = field;
-            return *this;
-        }
-        Builder &query(std::string query)
-        {
-            query_ = query;
-            return *this;
-        }
-        QueryPtr operator()()
-        {
-            return std::shared_ptr<MatchQuery>(new MatchQuery(field_, query_));
-        }
+        return std::shared_ptr<MatchQuery>(new MatchQuery());
+    }
 
-      private:
-        std::string field_;
-        std::string query_;
-    };
+    std::shared_ptr<MatchQuery> field(const std::string &field)
+    {
+        field_ = field;
+        return shared_from_this();
+    }
+    std::shared_ptr<MatchQuery> query(const std::string &query)
+    {
+        query_ = query;
+        return shared_from_this();
+    }
 
-    Json::Value toJson() const
+    Json::Value toJson() const override
     {
         Json::Value json;
         json["match"][field_] = query_;
@@ -84,53 +73,43 @@ class MatchQuery : public Query
     std::string query_;
 };
 
-class MultiMatchQuery : public Query
+class MultiMatchQuery : public Query,
+                        public std::enable_shared_from_this<MultiMatchQuery>
 {
   private:
-    MultiMatchQuery(std::string query, std::vector<std::string> fields)
-        : query_(query), fields_(fields)
+    MultiMatchQuery()
     {
     }
 
   public:
-    class Builder
+    static auto newMultiMatchQuery()
     {
-      public:
-        Builder &fields(std::vector<std::string> fields)
-        {
-            fields_ = fields;
-            return *this;
-        }
-        Builder &query(std::string query)
-        {
-            query_ = query;
-            return *this;
-        }
-        QueryPtr operator()()
-        {
-            auto size = fields_.size();
-            if (size == 0)
-            {
-                std::string errorMessage(
-                    "MultiMatchQuery must support fields.");
-                throw ElasticSearchException(errorMessage);
-            }
-            else if (size == 1)
-            {
-                LOG_WARN << "Only one field is provided. It is recommended to "
-                            "use MatchQuery";
-            }
-            return std::shared_ptr<MultiMatchQuery>(
-                new MultiMatchQuery(query_, fields_));
-        }
-
-      private:
-        std::vector<std::string> fields_;
-        std::string query_;
-    };
-
-    Json::Value toJson() const
+        return std::shared_ptr<MultiMatchQuery>(new MultiMatchQuery());
+    }
+    auto fields(std::vector<std::string> fields)
     {
+        fields_ = fields;
+        return shared_from_this();
+    }
+    auto query(std::string query)
+    {
+        query_ = query;
+        return shared_from_this();
+    }
+
+    Json::Value toJson() const override
+    {
+        auto size = fields_.size();
+        if (size == 0)
+        {
+            std::string errorMessage("MultiMatchQuery must support fields.");
+            throw ElasticSearchException(errorMessage);
+        }
+        else if (size == 1)
+        {
+            LOG_WARN << "Only one field is provided. It is recommended to "
+                        "use MatchQuery";
+        }
         Json::Value json;
         json["multi_match"]["query"] = query_;
         for (std::string field : fields_)
@@ -145,39 +124,30 @@ class MultiMatchQuery : public Query
     std::vector<std::string> fields_;
 };
 
-class TermQuery : public Query
+class TermQuery : public Query, public std::enable_shared_from_this<TermQuery>
 {
   private:
-    TermQuery(std::string field, std::string query)
-        : field_(field), query_(query)
+    TermQuery()
     {
     }
 
   public:
-    class Builder
+    static auto newTermQuery()
     {
-      public:
-        Builder &field(std::string field)
-        {
-            field_ = field;
-            return *this;
-        }
-        Builder &query(std::string query)
-        {
-            query_ = query;
-            return *this;
-        }
-        QueryPtr operator()()
-        {
-            return std::shared_ptr<TermQuery>(new TermQuery(field_, query_));
-        }
+        return std::shared_ptr<TermQuery>(new TermQuery());
+    }
+    auto field(std::string field)
+    {
+        field_ = field;
+        return shared_from_this();
+    }
+    auto query(std::string query)
+    {
+        query_ = query;
+        return shared_from_this();
+    }
 
-      private:
-        std::string field_;
-        std::string query_;
-    };
-
-    Json::Value toJson() const
+    Json::Value toJson() const override
     {
         Json::Value json;
         json["term"][field_]["value"] = query_;
@@ -189,161 +159,112 @@ class TermQuery : public Query
     std::string query_;
 };
 
-class RangeQuery : public Query
+class RangeQuery : public Query, public std::enable_shared_from_this<RangeQuery>
 {
   private:
-    RangeQuery(std::string field) : field_(field)
+    RangeQuery()
     {
-    }
-    RangeQuery &gt(double gt)
-    {
-        gt_ = std::make_shared<double>(gt);
-        return *this;
-    }
-    RangeQuery &lt(double lt)
-    {
-        lt_ = std::make_shared<double>(lt);
-        return *this;
-    }
-    RangeQuery &gte(double gte)
-    {
-        gte_ = std::make_shared<double>(gte);
-        return *this;
-    }
-    RangeQuery &lte(double lte)
-    {
-        lte_ = std::make_shared<double>(lte);
-        return *this;
     }
 
   public:
-    class Builder
+    static auto newRangeQuery()
     {
-      public:
-        Builder &field(std::string field)
+        return std::shared_ptr<RangeQuery>(new RangeQuery());
+    }
+    auto field(std::string field)
+    {
+        field_ = field;
+        return shared_from_this();
+    }
+    auto gt(double gt)
+    {
+        gt_ = std::make_shared<double>(gt);
+        return shared_from_this();
+    }
+    auto lt(double lt)
+    {
+        lt_ = std::make_shared<double>(lt);
+        return shared_from_this();
+    }
+    auto gte(double gte)
+    {
+        gte_ = std::make_shared<double>(gte);
+        return shared_from_this();
+    }
+    auto lte(double lte)
+    {
+        lte_ = std::make_shared<double>(lte);
+        return shared_from_this();
+    }
+
+    Json::Value toJson() const override
+    {
+        Json::Value json;
+        if (lt_ && lte_)
         {
-            field_ = field;
-            return *this;
+            throw ElasticSearchException(
+                "Cannot set lt and lte at the same time.");
         }
-        Builder &gt(double gt)
+        if (gt_ && gte_)
         {
-            gt_ = std::make_shared<double>(gt);
-            return *this;
+            throw ElasticSearchException(
+                "Cannot set gt and gte at the same time.");
         }
-        Builder &lt(double lt)
+        if (gte_)
         {
-            lt_ = std::make_shared<double>(lt);
-            return *this;
-        }
-        Builder &gte(double gte)
-        {
-            gte_ = std::make_shared<double>(gte);
-            return *this;
-        }
-        Builder &lte(double lte)
-        {
-            lte_ = std::make_shared<double>(lte);
-            return *this;
-        }
-        auto operator()()
-        {
-            if (lt_ && lte_)
+            if (lte_)
             {
-                throw ElasticSearchException(
-                    "Cannot set lt and lte at the same time.");
-            }
-            if (gt_ && gte_)
-            {
-                throw ElasticSearchException(
-                    "Cannot set gt and gte at the same time.");
-            }
-            auto query = std::shared_ptr<RangeQuery>(new RangeQuery(field_));
-            if (gte_)
-            {
-                if (lte_)
+                if (*gte_ > *lte_)
                 {
-                    if (*gte_ > *lte_)
-                    {
-                        throw ElasticSearchException(
-                            "Gte cannot be greater than lte.");
-                    }
-                    query->lte(*lte_);
+                    throw ElasticSearchException(
+                        "Gte cannot be greater than lte.");
                 }
-                else if (lt_)
-                {
-                    if (*gte_ >= *lt_)
-                    {
-                        throw ElasticSearchException(
-                            "Gte cannot be greater than or eaual to lt.");
-                    }
-                    query->lt(*lt_);
-                }
-                query->gte(*gte_);
-            }
-            else if (gt_)
-            {
-                if (lte_)
-                {
-                    if (*gt_ >= *lte_)
-                    {
-                        throw ElasticSearchException(
-                            "Gt cannot be greater than or equal to lte.");
-                    }
-                    query->lte(*lte_);
-                }
-                else if (lt_)
-                {
-                    if (*gt_ >= *lt_)
-                    {
-                        throw ElasticSearchException(
-                            "Gt cannot be greater than or equal to lt.");
-                    }
-                    query->lt(*lt_);
-                }
-                query->gt(*gt_);
-            }
-            else if (lte_)
-            {
-                query->lte(*lte_);
+                json["range"][field_]["lte"] = *lte_;
             }
             else if (lt_)
             {
-                query->lt(*lt_);
+                if (*gte_ >= *lt_)
+                {
+                    throw ElasticSearchException(
+                        "Gte cannot be greater than or eaual to lt.");
+                }
+                json["range"][field_]["lt"] = *lt_;
             }
-            else
-            {
-                throw ElasticSearchException(
-                    "Please set at least one condition.");
-            }
-            return query;
+            json["range"][field_]["gte"] = *gte_;
         }
-
-      private:
-        std::string field_;
-        std::shared_ptr<double> gt_;
-        std::shared_ptr<double> lt_;
-        std::shared_ptr<double> gte_;
-        std::shared_ptr<double> lte_;
-    };
-
-    Json::Value toJson() const
-    {
-        Json::Value json;
-        if (gt_ != nullptr)
+        else if (gt_)
         {
+            if (lte_)
+            {
+                if (*gt_ >= *lte_)
+                {
+                    throw ElasticSearchException(
+                        "Gt cannot be greater than or equal to lte.");
+                }
+                json["range"][field_]["lte"] = *lte_;
+            }
+            else if (lt_)
+            {
+                if (*gt_ >= *lt_)
+                {
+                    throw ElasticSearchException(
+                        "Gt cannot be greater than or equal to lt.");
+                }
+                json["range"][field_]["lt"] = *lt_;
+            }
             json["range"][field_]["gt"] = *gt_;
         }
-        if (lt_ != nullptr)
+        else if (lte_)
+        {
+            json["range"][field_]["lte"] = *lte_;
+        }
+        else if (lt_)
         {
             json["range"][field_]["lt"] = *lt_;
         }
-        if (gte_ != nullptr)
+        else
         {
-            json["range"][field_]["gte"] = *gte_;
-        }
-        if (lte_ != nullptr)
-        {
-            json["range"][field_]["lte"] = *lte_;
+            throw ElasticSearchException("Please set at least one condition.");
         }
         return json;
     }
@@ -558,104 +479,39 @@ class GeoDistanceQuery : public Query
 //     BoostMode boostMode_;
 // };
 
-class BoolQuery : public Query
+class BoolQuery : public Query, public std::enable_shared_from_this<BoolQuery>
 {
-  private:
-    BoolQuery() = default;
-    BoolQuery &must(const QueryPtr &mustQuery)
+  public:
+    static auto newBoolQuery()
+    {
+        return std::shared_ptr<BoolQuery>(new BoolQuery());
+    }
+
+    auto must(const QueryPtr &mustQuery)
     {
         must_.push_back(mustQuery);
-        return *this;
+        return shared_from_this();
     }
 
-    BoolQuery &should(const QueryPtr &shouldQuery)
+    auto should(const QueryPtr &shouldQuery)
     {
         should_.push_back(shouldQuery);
-        return *this;
+        return shared_from_this();
     }
 
-    BoolQuery &mustNot(const QueryPtr &mustNotQuery)
+    auto mustNot(const QueryPtr &mustNotQuery)
     {
         mustNot_.push_back(mustNotQuery);
-        return *this;
+        return shared_from_this();
     }
 
-    BoolQuery &filter(const QueryPtr &filterQuery)
+    auto filter(const QueryPtr &filterQuery)
     {
         filter_.push_back(filterQuery);
-        return *this;
+        return shared_from_this();
     }
 
-  public:
-    class Builder
-    {
-      public:
-        Builder &must(const QueryPtr &mustQuery)
-        {
-            must_.push_back(mustQuery);
-            return *this;
-        }
-
-        Builder &should(const QueryPtr &shouldQuery)
-        {
-            should_.push_back(shouldQuery);
-            return *this;
-        }
-
-        Builder &mustNot(const QueryPtr &mustNotQuery)
-        {
-            mustNot_.push_back(mustNotQuery);
-            return *this;
-        }
-
-        Builder &filter(const QueryPtr &filterQuery)
-        {
-            filter_.push_back(filterQuery);
-            return *this;
-        }
-
-        QueryPtr operator()()
-        {
-            auto query = std::shared_ptr<BoolQuery>(new BoolQuery());
-            if (must_.size() > 0)
-            {
-                for (const auto &must : must_)
-                {
-                    query->must(must);
-                }
-            }
-            if (should_.size() > 0)
-            {
-                for (const auto &should : should_)
-                {
-                    query->should(should);
-                }
-            }
-            if (mustNot_.size() > 0)
-            {
-                for (const auto &mustNot : mustNot_)
-                {
-                    query->mustNot(mustNot);
-                }
-            }
-            if (filter_.size() > 0)
-            {
-                for (const auto &filter : filter_)
-                {
-                    query->filter(filter);
-                }
-            }
-            return query;
-        }
-
-      private:
-        std::vector<QueryPtr> must_;
-        std::vector<QueryPtr> should_;
-        std::vector<QueryPtr> mustNot_;
-        std::vector<QueryPtr> filter_;
-    };
-
-    Json::Value toJson() const
+    Json::Value toJson() const override
     {
         Json::Value json;
         if (must_.size() > 0)

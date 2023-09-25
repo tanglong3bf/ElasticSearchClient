@@ -76,8 +76,8 @@ TEST_F(SearchTest, MatchAllTest)
         std::make_shared<HttpClient>("http://localhost:9200"));
 
     // mainTest
-    auto query = MatchAllQuery::Builder()();
-    SearchParam param("ds_index_name", MatchAllQuery::Builder()());
+    auto query = MatchAllQuery::newMatchAllQuery();
+    SearchParam param("ds_index_name", MatchAllQuery::newMatchAllQuery());
     auto resp = dClient.search<Account>(param);
     ASSERT_FALSE(resp->getTimedOut());
     EXPECT_EQ(0, resp->getShards()->getFailed());
@@ -98,7 +98,7 @@ TEST_F(SearchTest, MatchTest)
 
     // mainTest
     SearchParam param("ds_index_name",
-                      MatchQuery::Builder().field("age").query("28")());
+                      MatchQuery::newMatchQuery()->field("age")->query("28"));
     auto resp = dClient.search<Account>(param);
     ASSERT_FALSE(resp->getTimedOut());
     EXPECT_EQ(0, resp->getShards()->getFailed());
@@ -114,9 +114,10 @@ TEST_F(SearchTest, MatchTest)
 TEST_F(SearchTest, MultiMatchQueryTest)
 {
     using namespace tl::elasticsearch;
-    EXPECT_THROW(MultiMatchQuery::Builder().fields({})(),
+    EXPECT_THROW(MultiMatchQuery::newMultiMatchQuery()->fields({})->toJson(),
                  ElasticSearchException);
-    EXPECT_NO_THROW(MultiMatchQuery::Builder().fields({"aaa"})());
+    EXPECT_NO_THROW(
+        MultiMatchQuery::newMultiMatchQuery()->fields({"aaa"})->toJson());
 }
 
 TEST_F(SearchTest, MultiMatchTest)
@@ -126,9 +127,10 @@ TEST_F(SearchTest, MultiMatchTest)
         std::make_shared<HttpClient>("http://localhost:9200"));
 
     // mainTest
-    SearchParam param("ds_index_name",
-                      MultiMatchQuery::Builder().query("River").fields(
-                          {"firstname", "lastname", "address", "city"})());
+    SearchParam param(
+        "ds_index_name",
+        MultiMatchQuery::newMultiMatchQuery()->query("River")->fields(
+            {"firstname", "lastname", "address", "city"}));
     auto resp = dClient.search<Account>(param);
     ASSERT_FALSE(resp->getTimedOut());
     EXPECT_EQ(0, resp->getShards()->getFailed());
@@ -148,7 +150,8 @@ TEST_F(SearchTest, TermTest)
         std::make_shared<HttpClient>("http://localhost:9200"));
 
     SearchParam param("ds_index_name",
-                      TermQuery::Builder().field("address").query("street")());
+                      TermQuery::newTermQuery()->field("address")->query(
+                          "street"));
     auto resp = dClient.search<Account>(param);
     ASSERT_FALSE(resp->getTimedOut());
     EXPECT_EQ(0, resp->getShards()->getFailed());
@@ -164,30 +167,68 @@ TEST_F(SearchTest, TermTest)
 TEST_F(SearchTest, RangeParam)
 {
     using namespace tl::elasticsearch;
-    EXPECT_THROW(RangeQuery::Builder().field("balance")(),
+    EXPECT_THROW(RangeQuery::newRangeQuery()->field("balance")->toJson(),
                  ElasticSearchException);
-    EXPECT_THROW(RangeQuery::Builder().field("balance").gte(20000).gt(10000)(),
+    EXPECT_THROW(RangeQuery::newRangeQuery()
+                     ->field("balance")
+                     ->gte(20000)
+                     ->gt(10000)
+                     ->toJson(),
                  ElasticSearchException);
-    EXPECT_THROW(RangeQuery::Builder().field("balance").lte(20000).lt(10000)(),
+    EXPECT_THROW(RangeQuery::newRangeQuery()
+                     ->field("balance")
+                     ->lte(20000)
+                     ->lt(10000)
+                     ->toJson(),
                  ElasticSearchException);
-    EXPECT_THROW(RangeQuery::Builder().field("balance").gte(20000).lte(10000)(),
+    EXPECT_THROW(RangeQuery::newRangeQuery()
+                     ->field("balance")
+                     ->gte(20000)
+                     ->lte(10000)
+                     ->toJson(),
                  ElasticSearchException);
-    EXPECT_THROW(RangeQuery::Builder().field("balance").gte(20000).lt(10000)(),
+    EXPECT_THROW(RangeQuery::newRangeQuery()
+                     ->field("balance")
+                     ->gte(20000)
+                     ->lt(10000)
+                     ->toJson(),
                  ElasticSearchException);
-    EXPECT_THROW(RangeQuery::Builder().field("balance").gt(20000).lte(10000)(),
+    EXPECT_THROW(RangeQuery::newRangeQuery()
+                     ->field("balance")
+                     ->gt(20000)
+                     ->lte(10000)
+                     ->toJson(),
                  ElasticSearchException);
-    EXPECT_THROW(RangeQuery::Builder().field("balance").gt(20000).lt(10000)(),
+    EXPECT_THROW(RangeQuery::newRangeQuery()
+                     ->field("balance")
+                     ->gt(20000)
+                     ->lt(10000)
+                     ->toJson(),
                  ElasticSearchException);
+    EXPECT_NO_THROW(RangeQuery::newRangeQuery()
+                        ->field("balance")
+                        ->gte(10000)
+                        ->lte(20000)
+                        ->toJson());
+    EXPECT_NO_THROW(RangeQuery::newRangeQuery()
+                        ->field("balance")
+                        ->gte(10000)
+                        ->lt(20000)
+                        ->toJson());
+    EXPECT_NO_THROW(RangeQuery::newRangeQuery()
+                        ->field("balance")
+                        ->gt(10000)
+                        ->lte(20000)
+                        ->toJson());
+    EXPECT_NO_THROW(RangeQuery::newRangeQuery()
+                        ->field("balance")
+                        ->gt(10000)
+                        ->lt(20000)
+                        ->toJson());
     EXPECT_NO_THROW(
-        RangeQuery::Builder().field("balance").gte(10000).lte(20000)());
+        RangeQuery::newRangeQuery()->field("balance")->lte(10000)->toJson());
     EXPECT_NO_THROW(
-        RangeQuery::Builder().field("balance").gte(10000).lt(20000)());
-    EXPECT_NO_THROW(
-        RangeQuery::Builder().field("balance").gt(10000).lte(20000)());
-    EXPECT_NO_THROW(
-        RangeQuery::Builder().field("balance").gt(10000).lt(20000)());
-    EXPECT_NO_THROW(RangeQuery::Builder().field("balance").lte(10000)());
-    EXPECT_NO_THROW(RangeQuery::Builder().field("balance").lt(10000)());
+        RangeQuery::newRangeQuery()->field("balance")->lt(10000)->toJson());
 }
 
 TEST_F(SearchTest, RangeTest)
@@ -197,9 +238,9 @@ TEST_F(SearchTest, RangeTest)
         std::make_shared<HttpClient>("http://localhost:9200"));
 
     // mainTest
-    SearchParam param("ds_index_name",
-                      RangeQuery::Builder().field("balance").gte(10000).lte(
-                          30000)());
+    SearchParam param(
+        "ds_index_name",
+        RangeQuery::newRangeQuery()->field("balance")->gte(10000)->lte(30000));
     auto resp = dClient.search<Account>(param);
     ASSERT_FALSE(resp->getTimedOut());
     EXPECT_EQ(0, resp->getShards()->getFailed());
@@ -221,17 +262,17 @@ TEST_F(SearchTest, BoolTest)
     // mainTest
     SearchParam param(
         "ds_index_name",
-        BoolQuery::Builder()
-            .must(RangeQuery::Builder().field("age").gt(20).lt(40)())
-            .must(RangeQuery::Builder().field("balance").lte(40000)())
-            .must(BoolQuery::Builder()
-                      .should(MatchQuery::Builder()
-                                  .field("employer")
-                                  .query("Pyrami")())
-                      .should(MatchQuery::Builder()
-                                  .field("employer")
-                                  .query("Netagy")())())
-            .filter(MatchQuery::Builder().field("gender").query("M")())());
+        BoolQuery::newBoolQuery()
+            ->must(RangeQuery::newRangeQuery()->field("age")->gt(20)->lt(40))
+            ->must(RangeQuery::newRangeQuery()->field("balance")->lte(40000))
+            ->must(BoolQuery::newBoolQuery()
+                       ->should(MatchQuery::newMatchQuery()
+                                    ->field("employer")
+                                    ->query("Pyrami"))
+                       ->should(MatchQuery::newMatchQuery()
+                                    ->field("employer")
+                                    ->query("Netagy")))
+            ->filter(MatchQuery::newMatchQuery()->field("gender")->query("M")));
     auto resp = dClient.search<Account>(param);
     ASSERT_FALSE(resp->getTimedOut());
     EXPECT_EQ(0, resp->getShards()->getFailed());
