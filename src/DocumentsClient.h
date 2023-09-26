@@ -359,6 +359,54 @@ class GetParam
     std::string id_;
 };
 
+enum SortOrder
+{
+    ASC = 0,
+    DESC
+};
+
+inline std::string to_string(SortOrder sortOrder)
+{
+    switch (sortOrder)
+    {
+        case ASC:
+            return "asc";
+        case DESC:
+            return "desc";
+    }
+}
+
+class Sort
+{
+  public:
+    Sort(const std::string &field, SortOrder sortOrder)
+        : field_(field), sortOrder_(sortOrder)
+    {
+    }
+
+  public:
+    virtual Json::Value toJson() const
+    {
+        Json::Value json;
+        json[field_] = to_string(sortOrder_);
+        return json;
+    }
+
+    const std::string &field() const
+    {
+        return field_;
+    }
+
+    const SortOrder &sortOrder() const
+    {
+        return sortOrder_;
+    }
+
+  private:
+    std::string field_;
+    SortOrder sortOrder_;
+};
+
 class SearchParam
 {
   public:
@@ -378,9 +426,28 @@ class SearchParam
         return query_;
     }
 
+    void sort(std::string field, SortOrder order = ASC)
+    {
+        for (auto iter = sort_.cbegin(); iter != sort_.cend(); ++iter)
+        {
+            if (iter->field() == field)
+            {
+                sort_.erase(iter);
+                break;
+            }
+        }
+        sort_.push_back(Sort(field, order));
+    }
+
+    const auto &sort() const
+    {
+        return sort_;
+    }
+
   private:
     std::string index_;
     const QueryPtr query_;
+    std::vector<Sort> sort_;
 };
 
 template <typename Tp>
@@ -601,6 +668,15 @@ class DocumentsClient
 
         Json::Value requestBody;
         requestBody["query"] = param.query()->toJson();
+
+        const auto &sort = param.sort();
+        if (sort.size() != 0)
+        {
+            for (const auto &item : sort)
+            {
+                requestBody["sort"].append(item.toJson());
+            }
+        }
 
         httpClient_->sendRequest(
             path,
