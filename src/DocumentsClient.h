@@ -411,7 +411,7 @@ class SearchParam
 {
   public:
     SearchParam(const std::string &index, QueryPtr query)
-        : index_(index), query_(query)
+        : index_(index), query_(query), from_(0), size_(10)
     {
     }
 
@@ -421,12 +421,23 @@ class SearchParam
         return index_;
     }
 
-    const QueryPtr query() const
+    Json::Value toJson() const
     {
-        return query_;
+        Json::Value json;
+        json["query"] = query_->toJson();
+        if (sort_.size() > 0)
+        {
+            for (const auto &item : sort_)
+            {
+                json["sort"].append(item.toJson());
+            }
+        }
+        json["from"] = from_;
+        json["size"] = size_;
+        return json;
     }
 
-    void sort(std::string field, SortOrder order = ASC)
+    SearchParam &sort(std::string field, SortOrder order = ASC)
     {
         for (auto iter = sort_.cbegin(); iter != sort_.cend(); ++iter)
         {
@@ -437,17 +448,27 @@ class SearchParam
             }
         }
         sort_.push_back(Sort(field, order));
+        return *this;
     }
 
-    const auto &sort() const
+    SearchParam &from(int32_t from)
     {
-        return sort_;
+        from_ = from;
+        return *this;
+    }
+
+    SearchParam &size(int32_t size)
+    {
+        size_ = size;
+        return *this;
     }
 
   private:
     std::string index_;
     const QueryPtr query_;
     std::vector<Sort> sort_;
+    int32_t from_;
+    int32_t size_;
 };
 
 template <typename Tp>
@@ -666,17 +687,7 @@ class DocumentsClient
         path += param.index();
         path += "/_search";
 
-        Json::Value requestBody;
-        requestBody["query"] = param.query()->toJson();
-
-        const auto &sort = param.sort();
-        if (sort.size() != 0)
-        {
-            for (const auto &item : sort)
-            {
-                requestBody["sort"].append(item.toJson());
-            }
-        }
+        Json::Value requestBody = param.toJson();
 
         httpClient_->sendRequest(
             path,

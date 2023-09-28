@@ -310,3 +310,29 @@ TEST_F(SearchTest, SortTest)
     EXPECT_EQ(49404, hits[8].getSource().toJson()["balance"]);
     EXPECT_EQ(49355, hits[9].getSource().toJson()["balance"]);
 }
+
+TEST_F(SearchTest, PaginateTest)
+{
+    using namespace tl::elasticsearch;
+    DocumentsClient dClient(
+        std::make_shared<HttpClient>("http://localhost:9200"));
+
+    SearchParam param("ds_index_name", MatchAllQuery::newMatchAllQuery());
+    param.sort("balance", DESC).from(10);
+    auto resp = dClient.search<Account>(param);
+    ASSERT_FALSE(resp->getTimedOut());
+    EXPECT_EQ(0, resp->getShards()->getFailed());
+    EXPECT_EQ(1000, resp->getHitsTotal());
+    EXPECT_EQ(10, resp->getHits().size());
+    auto hits = resp->getHits();
+    EXPECT_EQ(49339, hits[0].getSource().toJson()["balance"]);
+    EXPECT_EQ(49334, hits[1].getSource().toJson()["balance"]);
+    EXPECT_EQ(49252, hits[2].getSource().toJson()["balance"]);
+    EXPECT_EQ(49222, hits[3].getSource().toJson()["balance"]);
+    EXPECT_EQ(49205, hits[4].getSource().toJson()["balance"]);
+    EXPECT_EQ(49159, hits[5].getSource().toJson()["balance"]);
+    EXPECT_EQ(49119, hits[6].getSource().toJson()["balance"]);
+    EXPECT_EQ(49000, hits[7].getSource().toJson()["balance"]);
+    EXPECT_EQ(48997, hits[8].getSource().toJson()["balance"]);
+    EXPECT_EQ(48974, hits[9].getSource().toJson()["balance"]);
+}
