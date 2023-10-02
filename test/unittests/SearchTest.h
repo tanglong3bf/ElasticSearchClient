@@ -111,6 +111,27 @@ TEST_F(SearchTest, MatchTest)
     }
 }
 
+TEST_F(SearchTest, MatchPhraseTest)
+{
+    using namespace tl::elasticsearch;
+    DocumentsClient dClient(
+        std::make_shared<HttpClient>("http://localhost:9200"));
+
+    // mainTest
+    SearchParam param("ds_index_name",
+                      MatchPhraseQuery::newMatchPhraseQuery()->field("address")->query("mill lane"));
+    auto resp = dClient.search<Account>(param);
+    ASSERT_FALSE(resp->getTimedOut());
+    EXPECT_EQ(0, resp->getShards()->getFailed());
+    EXPECT_EQ(1, resp->getHitsTotal());
+    EXPECT_EQ(1, resp->getHits().size());
+    for (const auto &item : resp->getHits())
+    {
+        EXPECT_STREQ("ds_index_name", item.getIndex().c_str());
+        EXPECT_NO_THROW(item.getSource());
+    }
+}
+
 TEST_F(SearchTest, MultiMatchQueryTest)
 {
     using namespace tl::elasticsearch;

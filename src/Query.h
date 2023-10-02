@@ -73,6 +73,43 @@ class MatchQuery : public Query, public std::enable_shared_from_this<MatchQuery>
     std::string query_;
 };
 
+class MatchPhraseQuery : public Query,
+                         public std::enable_shared_from_this<MatchPhraseQuery>
+{
+  private:
+    MatchPhraseQuery()
+    {
+    }
+
+  public:
+    static auto newMatchPhraseQuery()
+    {
+        return std::shared_ptr<MatchPhraseQuery>(new MatchPhraseQuery());
+    }
+
+    std::shared_ptr<MatchPhraseQuery> field(const std::string &field)
+    {
+        field_ = field;
+        return shared_from_this();
+    }
+    std::shared_ptr<MatchPhraseQuery> query(const std::string &query)
+    {
+        query_ = query;
+        return shared_from_this();
+    }
+
+    Json::Value toJson() const override
+    {
+        Json::Value json;
+        json["match_phrase"][field_] = query_;
+        return json;
+    }
+
+  private:
+    std::string field_;
+    std::string query_;
+};
+
 class MultiMatchQuery : public Query,
                         public std::enable_shared_from_this<MultiMatchQuery>
 {
