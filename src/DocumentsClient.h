@@ -3,6 +3,7 @@
 #include <functional>
 #include <json/value.h>
 #include <memory>
+#include "Aggregation.h"
 #include "ElasticSearchException.h"
 #include "HttpClient.h"
 #include "Query.h"
@@ -410,8 +411,7 @@ class Sort
 class SearchParam
 {
   public:
-    SearchParam(const std::string &index, QueryPtr query)
-        : index_(index), query_(query), from_(0), size_(10)
+    SearchParam(const std::string &index) : index_(index), from_(0), size_(10)
     {
     }
 
@@ -424,7 +424,10 @@ class SearchParam
     Json::Value toJson() const
     {
         Json::Value json;
-        json["query"] = query_->toJson();
+        if (query_)
+        {
+            json["query"] = query_->toJson();
+        }
         if (sort_.size() > 0)
         {
             for (const auto &item : sort_)
@@ -434,7 +437,17 @@ class SearchParam
         }
         json["from"] = from_;
         json["size"] = size_;
+        if (agg_)
+        {
+            json["aggs"][aggsName_] = agg_->toJson();
+        }
         return json;
+    }
+
+    SearchParam &query(QueryPtr query)
+    {
+        query_ = query;
+        return *this;
     }
 
     SearchParam &sort(std::string field, SortOrder order = ASC)
@@ -463,12 +476,21 @@ class SearchParam
         return *this;
     }
 
+    SearchParam &agg(AggPtr agg, const std::string &name)
+    {
+        agg_ = agg;
+        aggsName_ = name;
+        return *this;
+    }
+
   private:
     std::string index_;
-    const QueryPtr query_;
+    QueryPtr query_;
     std::vector<Sort> sort_;
     int32_t from_;
     int32_t size_;
+    AggPtr agg_;
+    std::string aggsName_;
 };
 
 template <typename Tp>
@@ -529,6 +551,95 @@ class Hit
     std::shared_ptr<Tp> source_;
 };
 
+class Bucket
+{
+  public:
+    void setByJson(const Json::Value &json)
+    {
+        if (json.isMember("key"))
+        {
+            key_ = json["key"].asString();
+        }
+        if (json.isMember("doc_count"))
+        {
+            docCount_ = json["doc_count"].asInt();
+        }
+    }
+    std::string key() const
+    {
+        return key_;
+    }
+    std::size_t docCount() const
+    {
+        return docCount_;
+    }
+
+  private:
+    std::string key_;
+    std::size_t docCount_;
+};
+
+class Aggregation
+{
+  public:
+    void setByJson(const Json::Value &json)
+    {
+        if (json.isMember("doc_count_error_upper_bound"))
+        {
+            docCountErrorUpperBound_ =
+                json["doc_count_error_upper_bound"].asInt();
+        }
+        if (json.isMember("sum_other_doc_count"))
+        {
+            sumOtherDocCount_ = json["sum_other_doc_count"].asInt();
+        }
+        for (const auto &item : json["buckets"])
+        {
+            Bucket bucket;
+            bucket.setByJson(item);
+            buckets_.push_back(bucket);
+        }
+    }
+    std::size_t docCountErrorUpperBound() const
+    {
+        return docCountErrorUpperBound_;
+    }
+    std::size_t sumOtherDocCount() const
+    {
+        return sumOtherDocCount_;
+    }
+    const auto &buckets() const
+    {
+        return buckets_;
+    }
+
+  private:
+    std::size_t docCountErrorUpperBound_;
+    std::size_t sumOtherDocCount_;
+    std::vector<Bucket> buckets_;
+};
+
+class Aggregations
+{
+  public:
+    void setByJson(const Json::Value &json)
+    {
+        for (const auto &key : json.getMemberNames())
+        {
+            Aggregation agg;
+            agg.setByJson(json[key]);
+            aggregations_[key] = agg;
+        }
+    }
+    auto getAggregations() const
+    {
+        return aggregations_;
+    }
+
+  private:
+    std::unordered_map<std::string, Aggregation> aggregations_;
+};
+
 template <typename Tp>
     requires isDocumentType<Tp>
 class SearchResponse
@@ -571,6 +682,11 @@ class SearchResponse
                 }
             }
         }
+        if (json.isMember("aggregations"))
+        {
+            aggs_ = std::make_shared<Aggregations>();
+            aggs_->setByJson(json["aggregations"]);
+        }
     }
 
     auto getTook()
@@ -597,6 +713,10 @@ class SearchResponse
     {
         return hits_;
     }
+    auto getAggregations()
+    {
+        return aggs_;
+    }
 
   private:
     uint32_t took_;
@@ -605,6 +725,7 @@ class SearchResponse
     uint32_t hits__total_;
     std::shared_ptr<double> hits__max_score_;
     std::vector<Hit<Tp>> hits_;
+    std::shared_ptr<Aggregations> aggs_;
 };
 
 template <typename Tp>

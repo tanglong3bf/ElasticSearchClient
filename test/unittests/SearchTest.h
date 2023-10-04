@@ -77,7 +77,8 @@ TEST_F(SearchTest, MatchAllTest)
 
     // mainTest
     auto query = MatchAllQuery::newMatchAllQuery();
-    SearchParam param("ds_index_name", MatchAllQuery::newMatchAllQuery());
+    SearchParam param("ds_index_name");
+    param.query(MatchAllQuery::newMatchAllQuery());
     auto resp = dClient.search<Account>(param);
     ASSERT_FALSE(resp->getTimedOut());
     EXPECT_EQ(0, resp->getShards()->getFailed());
@@ -97,8 +98,8 @@ TEST_F(SearchTest, MatchTest)
         std::make_shared<HttpClient>("http://localhost:9200"));
 
     // mainTest
-    SearchParam param("ds_index_name",
-                      MatchQuery::newMatchQuery()->field("age")->query("28"));
+    SearchParam param("ds_index_name");
+    param.query(MatchQuery::newMatchQuery()->field("age")->query("28"));
     auto resp = dClient.search<Account>(param);
     ASSERT_FALSE(resp->getTimedOut());
     EXPECT_EQ(0, resp->getShards()->getFailed());
@@ -118,8 +119,10 @@ TEST_F(SearchTest, MatchPhraseTest)
         std::make_shared<HttpClient>("http://localhost:9200"));
 
     // mainTest
-    SearchParam param("ds_index_name",
-                      MatchPhraseQuery::newMatchPhraseQuery()->field("address")->query("mill lane"));
+    SearchParam param("ds_index_name");
+    param.query(
+        MatchPhraseQuery::newMatchPhraseQuery()->field("address")->query(
+            "mill lane"));
     auto resp = dClient.search<Account>(param);
     ASSERT_FALSE(resp->getTimedOut());
     EXPECT_EQ(0, resp->getShards()->getFailed());
@@ -148,10 +151,9 @@ TEST_F(SearchTest, MultiMatchTest)
         std::make_shared<HttpClient>("http://localhost:9200"));
 
     // mainTest
-    SearchParam param(
-        "ds_index_name",
-        MultiMatchQuery::newMultiMatchQuery()->query("River")->fields(
-            {"firstname", "lastname", "address", "city"}));
+    SearchParam param("ds_index_name");
+    param.query(MultiMatchQuery::newMultiMatchQuery()->query("River")->fields(
+        {"firstname", "lastname", "address", "city"}));
     auto resp = dClient.search<Account>(param);
     ASSERT_FALSE(resp->getTimedOut());
     EXPECT_EQ(0, resp->getShards()->getFailed());
@@ -170,9 +172,8 @@ TEST_F(SearchTest, TermTest)
     DocumentsClient dClient(
         std::make_shared<HttpClient>("http://localhost:9200"));
 
-    SearchParam param("ds_index_name",
-                      TermQuery::newTermQuery()->field("address")->query(
-                          "street"));
+    SearchParam param("ds_index_name");
+    param.query(TermQuery::newTermQuery()->field("address")->query("street"));
     auto resp = dClient.search<Account>(param);
     ASSERT_FALSE(resp->getTimedOut());
     EXPECT_EQ(0, resp->getShards()->getFailed());
@@ -259,8 +260,8 @@ TEST_F(SearchTest, RangeTest)
         std::make_shared<HttpClient>("http://localhost:9200"));
 
     // mainTest
-    SearchParam param(
-        "ds_index_name",
+    SearchParam param("ds_index_name");
+    param.query(
         RangeQuery::newRangeQuery()->field("balance")->gte(10000)->lte(30000));
     auto resp = dClient.search<Account>(param);
     ASSERT_FALSE(resp->getTimedOut());
@@ -281,8 +282,8 @@ TEST_F(SearchTest, BoolTest)
         std::make_shared<HttpClient>("http://localhost:9200"));
 
     // mainTest
-    SearchParam param(
-        "ds_index_name",
+    SearchParam param("ds_index_name");
+    param.query(
         BoolQuery::newBoolQuery()
             ->must(RangeQuery::newRangeQuery()->field("age")->gt(20)->lt(40))
             ->must(RangeQuery::newRangeQuery()->field("balance")->lte(40000))
@@ -312,7 +313,8 @@ TEST_F(SearchTest, SortTest)
     DocumentsClient dClient(
         std::make_shared<HttpClient>("http://localhost:9200"));
 
-    SearchParam param("ds_index_name", MatchAllQuery::newMatchAllQuery());
+    SearchParam param("ds_index_name");
+    param.query(MatchAllQuery::newMatchAllQuery());
     param.sort("balance", DESC);
     auto resp = dClient.search<Account>(param);
     ASSERT_FALSE(resp->getTimedOut());
@@ -338,7 +340,8 @@ TEST_F(SearchTest, PaginateTest)
     DocumentsClient dClient(
         std::make_shared<HttpClient>("http://localhost:9200"));
 
-    SearchParam param("ds_index_name", MatchAllQuery::newMatchAllQuery());
+    SearchParam param("ds_index_name");
+    param.query(MatchAllQuery::newMatchAllQuery());
     param.sort("balance", DESC).from(10);
     auto resp = dClient.search<Account>(param);
     ASSERT_FALSE(resp->getTimedOut());
@@ -356,4 +359,35 @@ TEST_F(SearchTest, PaginateTest)
     EXPECT_EQ(49000, hits[7].getSource().toJson()["balance"]);
     EXPECT_EQ(48997, hits[8].getSource().toJson()["balance"]);
     EXPECT_EQ(48974, hits[9].getSource().toJson()["balance"]);
+}
+
+TEST_F(SearchTest, TermAggTest)
+{
+    using namespace tl::elasticsearch;
+    DocumentsClient dClient(
+        std::make_shared<HttpClient>("http://localhost:9200"));
+
+    SearchParam param("ds_index_name");
+    param.size(0).agg(TermsAgg::newTermsAgg()->field("state.keyword"),
+                      "group_by_state");
+    auto resp = dClient.search<Account>(param);
+    EXPECT_EQ(0,
+              resp->getAggregations()
+                  ->getAggregations()["group_by_state"]
+                  .sumOtherDocCount());
+    EXPECT_EQ(0,
+              resp->getAggregations()
+                  ->getAggregations()["group_by_state"]
+                  .docCountErrorUpperBound());
+    EXPECT_EQ(30,
+              resp->getAggregations()
+                  ->getAggregations()["group_by_state"]
+                  .buckets()[0]
+                  .docCount());
+    EXPECT_STREQ("TX",
+                 resp->getAggregations()
+                     ->getAggregations()["group_by_state"]
+                     .buckets()[0]
+                     .key()
+                     .c_str());
 }
