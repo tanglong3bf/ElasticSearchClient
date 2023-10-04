@@ -35,7 +35,7 @@ class TermsAgg : public Agg, public std::enable_shared_from_this<TermsAgg>
 
     auto size(const int32_t &size)
     {
-        this->size_ = size;
+        this->size_ = std::make_shared<int32_t>(size);
         return shared_from_this();
     }
 
@@ -43,13 +43,16 @@ class TermsAgg : public Agg, public std::enable_shared_from_this<TermsAgg>
     {
         Json::Value result;
         result["terms"]["field"] = field_;
-        result["terms"]["size"] = size_;
+        if (size_)
+        {
+            result["terms"]["size"] = *size_;
+        }
         return result;
     }
 
   private:
     std::string field_;
-    int32_t size_;
+    std::shared_ptr<int32_t> size_;
 };
 
 };  // namespace tl::elasticsearch

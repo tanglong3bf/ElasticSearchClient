@@ -342,7 +342,7 @@ TEST_F(SearchTest, PaginateTest)
 
     SearchParam param("ds_index_name");
     param.query(MatchAllQuery::newMatchAllQuery());
-    param.sort("balance", DESC).from(10);
+    param.sort("balance", DESC).from(10).size(10);
     auto resp = dClient.search<Account>(param);
     ASSERT_FALSE(resp->getTimedOut());
     EXPECT_EQ(0, resp->getShards()->getFailed());
@@ -371,20 +371,20 @@ TEST_F(SearchTest, TermAggTest)
     param.size(0).agg(TermsAgg::newTermsAgg()->field("state.keyword"),
                       "group_by_state");
     auto resp = dClient.search<Account>(param);
-    EXPECT_EQ(0,
+    EXPECT_EQ(770,
               resp->getAggregations()
                   ->getAggregations()["group_by_state"]
                   .sumOtherDocCount());
-    EXPECT_EQ(0,
+    EXPECT_EQ(20,
               resp->getAggregations()
                   ->getAggregations()["group_by_state"]
                   .docCountErrorUpperBound());
-    EXPECT_EQ(30,
+    EXPECT_EQ(27,
               resp->getAggregations()
                   ->getAggregations()["group_by_state"]
                   .buckets()[0]
                   .docCount());
-    EXPECT_STREQ("TX",
+    EXPECT_STREQ("ID",
                  resp->getAggregations()
                      ->getAggregations()["group_by_state"]
                      .buckets()[0]

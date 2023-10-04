@@ -411,7 +411,7 @@ class Sort
 class SearchParam
 {
   public:
-    SearchParam(const std::string &index) : index_(index), from_(0), size_(10)
+    SearchParam(const std::string &index) : index_(index)
     {
     }
 
@@ -435,8 +435,14 @@ class SearchParam
                 json["sort"].append(item.toJson());
             }
         }
-        json["from"] = from_;
-        json["size"] = size_;
+        if (from_)
+        {
+            json["from"] = *from_;
+        }
+        if (from_)
+        {
+            json["size"] = *size_;
+        }
         if (agg_)
         {
             json["aggs"][aggsName_] = agg_->toJson();
@@ -466,13 +472,13 @@ class SearchParam
 
     SearchParam &from(int32_t from)
     {
-        from_ = from;
+        from_ = std::make_shared<int32_t>(from);
         return *this;
     }
 
     SearchParam &size(int32_t size)
     {
-        size_ = size;
+        size_ = std::make_shared<int32_t>(size);
         return *this;
     }
 
@@ -487,8 +493,8 @@ class SearchParam
     std::string index_;
     QueryPtr query_;
     std::vector<Sort> sort_;
-    int32_t from_;
-    int32_t size_;
+    std::shared_ptr<int32_t> from_;
+    std::shared_ptr<int32_t> size_;
     AggPtr agg_;
     std::string aggsName_;
 };
@@ -808,6 +814,7 @@ class DocumentsClient
         path += param.index();
         path += "/_search";
 
+        LOG_DEBUG << param.toJson().toStyledString();
         Json::Value requestBody = param.toJson();
 
         httpClient_->sendRequest(
