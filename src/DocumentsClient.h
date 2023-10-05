@@ -445,7 +445,7 @@ class SearchParam
         }
         if (agg_)
         {
-            json["aggs"][aggsName_] = agg_->toJson();
+            json["aggs"] = agg_->toJson();
         }
         return json;
     }
@@ -482,10 +482,9 @@ class SearchParam
         return *this;
     }
 
-    SearchParam &agg(AggPtr agg, const std::string &name)
+    SearchParam &agg(AggPtr agg)
     {
         agg_ = agg;
-        aggsName_ = name;
         return *this;
     }
 
@@ -496,7 +495,6 @@ class SearchParam
     std::shared_ptr<int32_t> from_;
     std::shared_ptr<int32_t> size_;
     AggPtr agg_;
-    std::string aggsName_;
 };
 
 template <typename Tp>
@@ -585,26 +583,39 @@ class Bucket
     std::size_t docCount_;
 };
 
-class Aggregation
+class AggregationsResponse
 {
   public:
     void setByJson(const Json::Value &json)
     {
-        if (json.isMember("doc_count_error_upper_bound"))
+        auto names = json.getMemberNames();
+        if (names.size() != 1)
+        {
+            throw ElasticSearchException(
+                "AggregationsResponse only allows receiving a json object with "
+                "one key-value pair");
+        }
+		name_ = names[0];
+        auto content = json[name_];
+        if (content.isMember("doc_count_error_upper_bound"))
         {
             docCountErrorUpperBound_ =
-                json["doc_count_error_upper_bound"].asInt();
+                content["doc_count_error_upper_bound"].asInt();
         }
-        if (json.isMember("sum_other_doc_count"))
+        if (content.isMember("sum_other_doc_count"))
         {
-            sumOtherDocCount_ = json["sum_other_doc_count"].asInt();
+            sumOtherDocCount_ = content["sum_other_doc_count"].asInt();
         }
-        for (const auto &item : json["buckets"])
+        for (const auto &item : content["buckets"])
         {
             Bucket bucket;
             bucket.setByJson(item);
             buckets_.push_back(bucket);
         }
+    }
+    std::string name() const
+    {
+        return name_;
     }
     std::size_t docCountErrorUpperBound() const
     {
@@ -620,30 +631,10 @@ class Aggregation
     }
 
   private:
+    std::string name_;
     std::size_t docCountErrorUpperBound_;
     std::size_t sumOtherDocCount_;
     std::vector<Bucket> buckets_;
-};
-
-class Aggregations
-{
-  public:
-    void setByJson(const Json::Value &json)
-    {
-        for (const auto &key : json.getMemberNames())
-        {
-            Aggregation agg;
-            agg.setByJson(json[key]);
-            aggregations_[key] = agg;
-        }
-    }
-    auto getAggregations() const
-    {
-        return aggregations_;
-    }
-
-  private:
-    std::unordered_map<std::string, Aggregation> aggregations_;
 };
 
 template <typename Tp>
@@ -690,8 +681,14 @@ class SearchResponse
         }
         if (json.isMember("aggregations"))
         {
-            aggs_ = std::make_shared<Aggregations>();
-            aggs_->setByJson(json["aggregations"]);
+            for (const auto &item : json["aggregations"].getMemberNames())
+            {
+                Json::Value temp;
+                temp[item] = json["aggregations"][item];
+                AggregationsResponse aggregations;
+                aggregations.setByJson(temp);
+                aggregations_[item] = aggregations;
+            }
         }
     }
 
@@ -719,9 +716,9 @@ class SearchResponse
     {
         return hits_;
     }
-    auto getAggregations()
+    auto getAggregationsResponse()
     {
-        return aggs_;
+        return aggregations_;
     }
 
   private:
@@ -731,7 +728,7 @@ class SearchResponse
     uint32_t hits__total_;
     std::shared_ptr<double> hits__max_score_;
     std::vector<Hit<Tp>> hits_;
-    std::shared_ptr<Aggregations> aggs_;
+    std::unordered_map<std::string, AggregationsResponse> aggregations_;
 };
 
 template <typename Tp>
@@ -814,7 +811,6 @@ class DocumentsClient
         path += param.index();
         path += "/_search";
 
-        LOG_DEBUG << param.toJson().toStyledString();
         Json::Value requestBody = param.toJson();
 
         httpClient_->sendRequest(

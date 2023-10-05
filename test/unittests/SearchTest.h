@@ -47,9 +47,9 @@ class SearchTest : public testing::Test
     }
     static void TearDownTestCase()
     {
-        using namespace tl::elasticsearch;
-        HttpClient httpClient("http://localhost:9200");
-        httpClient.sendRequest("/ds_index_name", drogon::Delete);
+        // using namespace tl::elasticsearch;
+        // HttpClient httpClient("http://localhost:9200");
+        // httpClient.sendRequest("/ds_index_name", drogon::Delete);
     }
 };
 
@@ -368,26 +368,15 @@ TEST_F(SearchTest, TermAggTest)
         std::make_shared<HttpClient>("http://localhost:9200"));
 
     SearchParam param("ds_index_name");
-    param.size(0).agg(TermsAgg::newTermsAgg()->field("state.keyword"),
-                      "group_by_state");
+    param.size(0).agg(TermsAggregations::newTermsAgg()
+                          ->name("group_by_state")
+                          ->field("state.keyword"));
     auto resp = dClient.search<Account>(param);
-    EXPECT_EQ(770,
-              resp->getAggregations()
-                  ->getAggregations()["group_by_state"]
-                  .sumOtherDocCount());
-    EXPECT_EQ(20,
-              resp->getAggregations()
-                  ->getAggregations()["group_by_state"]
-                  .docCountErrorUpperBound());
-    EXPECT_EQ(27,
-              resp->getAggregations()
-                  ->getAggregations()["group_by_state"]
-                  .buckets()[0]
-                  .docCount());
-    EXPECT_STREQ("ID",
-                 resp->getAggregations()
-                     ->getAggregations()["group_by_state"]
-                     .buckets()[0]
-                     .key()
-                     .c_str());
+    auto aggResp = resp->getAggregationsResponse();
+    ASSERT_EQ(1, aggResp.size());
+    EXPECT_STREQ("group_by_state", aggResp["group_by_state"].name().c_str());
+    EXPECT_EQ(770, aggResp["group_by_state"].sumOtherDocCount());
+    EXPECT_EQ(20, aggResp["group_by_state"].docCountErrorUpperBound());
+    EXPECT_EQ(27, aggResp["group_by_state"].buckets()[0].docCount());
+    EXPECT_STREQ("ID", aggResp["group_by_state"].buckets()[0].key().c_str());
 }

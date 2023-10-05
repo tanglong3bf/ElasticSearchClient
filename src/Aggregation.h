@@ -1,30 +1,48 @@
 #pragma once
 
 #include <json/value.h>
+#include <string>
+#include <unordered_map>
 
 namespace tl::elasticsearch
 {
 
-class AggregationParam
+class Aggregations;
+using AggPtr = std::shared_ptr<Aggregations>;
+
+class Aggregations
 {
   public:
     virtual Json::Value toJson() const = 0;
+
+  protected:
+    std::string name_;
 };
 
-using Agg = AggregationParam;
-using AggPtr = std::shared_ptr<Agg>;
+class BucketAggregations : public Aggregations
+{
+  protected:
+    std::unordered_map<std::string, AggPtr> nestedAggregations_;
+};
 
-class TermsAgg : public Agg, public std::enable_shared_from_this<TermsAgg>
+class TermsAggregations : public BucketAggregations,
+                          public std::enable_shared_from_this<TermsAggregations>
 {
   private:
-    TermsAgg()
+    TermsAggregations()
     {
     }
 
   public:
     static auto newTermsAgg()
     {
-        return std::shared_ptr<TermsAgg>(new TermsAgg());
+        return std::shared_ptr<TermsAggregations>(new TermsAggregations());
+    }
+
+    auto name(const std::string &name)
+    {
+        name_ = name;
+        return shared_from_this();
     }
 
     auto field(const std::string &field)
@@ -42,10 +60,10 @@ class TermsAgg : public Agg, public std::enable_shared_from_this<TermsAgg>
     virtual Json::Value toJson() const override
     {
         Json::Value result;
-        result["terms"]["field"] = field_;
+        result[name_]["terms"]["field"] = field_;
         if (size_)
         {
-            result["terms"]["size"] = *size_;
+            result[name_]["terms"]["size"] = *size_;
         }
         return result;
     }
