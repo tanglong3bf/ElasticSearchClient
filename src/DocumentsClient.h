@@ -555,88 +555,6 @@ class Hit
     std::shared_ptr<Tp> source_;
 };
 
-class Bucket
-{
-  public:
-    void setByJson(const Json::Value &json)
-    {
-        if (json.isMember("key"))
-        {
-            key_ = json["key"].asString();
-        }
-        if (json.isMember("doc_count"))
-        {
-            docCount_ = json["doc_count"].asInt();
-        }
-    }
-    std::string key() const
-    {
-        return key_;
-    }
-    std::size_t docCount() const
-    {
-        return docCount_;
-    }
-
-  private:
-    std::string key_;
-    std::size_t docCount_;
-};
-
-class AggregationsResponse
-{
-  public:
-    void setByJson(const Json::Value &json)
-    {
-        auto names = json.getMemberNames();
-        if (names.size() != 1)
-        {
-            throw ElasticSearchException(
-                "AggregationsResponse only allows receiving a json object with "
-                "one key-value pair");
-        }
-		name_ = names[0];
-        auto content = json[name_];
-        if (content.isMember("doc_count_error_upper_bound"))
-        {
-            docCountErrorUpperBound_ =
-                content["doc_count_error_upper_bound"].asInt();
-        }
-        if (content.isMember("sum_other_doc_count"))
-        {
-            sumOtherDocCount_ = content["sum_other_doc_count"].asInt();
-        }
-        for (const auto &item : content["buckets"])
-        {
-            Bucket bucket;
-            bucket.setByJson(item);
-            buckets_.push_back(bucket);
-        }
-    }
-    std::string name() const
-    {
-        return name_;
-    }
-    std::size_t docCountErrorUpperBound() const
-    {
-        return docCountErrorUpperBound_;
-    }
-    std::size_t sumOtherDocCount() const
-    {
-        return sumOtherDocCount_;
-    }
-    const auto &buckets() const
-    {
-        return buckets_;
-    }
-
-  private:
-    std::string name_;
-    std::size_t docCountErrorUpperBound_;
-    std::size_t sumOtherDocCount_;
-    std::vector<Bucket> buckets_;
-};
-
 template <typename Tp>
     requires isDocumentType<Tp>
 class SearchResponse
@@ -685,9 +603,8 @@ class SearchResponse
             {
                 Json::Value temp;
                 temp[item] = json["aggregations"][item];
-                AggregationsResponse aggregations;
-                aggregations.setByJson(temp);
-                aggregations_[item] = aggregations;
+                aggregations_[item] =
+                    AggregationsResponse::newAggregationsResponse(temp);
             }
         }
     }
@@ -728,7 +645,8 @@ class SearchResponse
     uint32_t hits__total_;
     std::shared_ptr<double> hits__max_score_;
     std::vector<Hit<Tp>> hits_;
-    std::unordered_map<std::string, AggregationsResponse> aggregations_;
+    std::unordered_map<std::string, std::shared_ptr<AggregationsResponse>>
+        aggregations_;
 };
 
 template <typename Tp>

@@ -322,16 +322,16 @@ TEST_F(SearchTest, SortTest)
     EXPECT_EQ(1000, resp->getHitsTotal());
     EXPECT_EQ(10, resp->getHits().size());
     auto hits = resp->getHits();
-    EXPECT_EQ(49989, hits[0].getSource().toJson()["balance"]);
-    EXPECT_EQ(49795, hits[1].getSource().toJson()["balance"]);
-    EXPECT_EQ(49741, hits[2].getSource().toJson()["balance"]);
-    EXPECT_EQ(49671, hits[3].getSource().toJson()["balance"]);
-    EXPECT_EQ(49587, hits[4].getSource().toJson()["balance"]);
-    EXPECT_EQ(49568, hits[5].getSource().toJson()["balance"]);
-    EXPECT_EQ(49567, hits[6].getSource().toJson()["balance"]);
-    EXPECT_EQ(49433, hits[7].getSource().toJson()["balance"]);
-    EXPECT_EQ(49404, hits[8].getSource().toJson()["balance"]);
-    EXPECT_EQ(49355, hits[9].getSource().toJson()["balance"]);
+    EXPECT_EQ(49989, hits[0].getSource().toJson()["balance"].asInt());
+    EXPECT_EQ(49795, hits[1].getSource().toJson()["balance"].asInt());
+    EXPECT_EQ(49741, hits[2].getSource().toJson()["balance"].asInt());
+    EXPECT_EQ(49671, hits[3].getSource().toJson()["balance"].asInt());
+    EXPECT_EQ(49587, hits[4].getSource().toJson()["balance"].asInt());
+    EXPECT_EQ(49568, hits[5].getSource().toJson()["balance"].asInt());
+    EXPECT_EQ(49567, hits[6].getSource().toJson()["balance"].asInt());
+    EXPECT_EQ(49433, hits[7].getSource().toJson()["balance"].asInt());
+    EXPECT_EQ(49404, hits[8].getSource().toJson()["balance"].asInt());
+    EXPECT_EQ(49355, hits[9].getSource().toJson()["balance"].asInt());
 }
 
 TEST_F(SearchTest, PaginateTest)
@@ -349,16 +349,16 @@ TEST_F(SearchTest, PaginateTest)
     EXPECT_EQ(1000, resp->getHitsTotal());
     EXPECT_EQ(10, resp->getHits().size());
     auto hits = resp->getHits();
-    EXPECT_EQ(49339, hits[0].getSource().toJson()["balance"]);
-    EXPECT_EQ(49334, hits[1].getSource().toJson()["balance"]);
-    EXPECT_EQ(49252, hits[2].getSource().toJson()["balance"]);
-    EXPECT_EQ(49222, hits[3].getSource().toJson()["balance"]);
-    EXPECT_EQ(49205, hits[4].getSource().toJson()["balance"]);
-    EXPECT_EQ(49159, hits[5].getSource().toJson()["balance"]);
-    EXPECT_EQ(49119, hits[6].getSource().toJson()["balance"]);
-    EXPECT_EQ(49000, hits[7].getSource().toJson()["balance"]);
-    EXPECT_EQ(48997, hits[8].getSource().toJson()["balance"]);
-    EXPECT_EQ(48974, hits[9].getSource().toJson()["balance"]);
+    EXPECT_EQ(49339, hits[0].getSource().toJson()["balance"].asInt());
+    EXPECT_EQ(49334, hits[1].getSource().toJson()["balance"].asInt());
+    EXPECT_EQ(49252, hits[2].getSource().toJson()["balance"].asInt());
+    EXPECT_EQ(49222, hits[3].getSource().toJson()["balance"].asInt());
+    EXPECT_EQ(49205, hits[4].getSource().toJson()["balance"].asInt());
+    EXPECT_EQ(49159, hits[5].getSource().toJson()["balance"].asInt());
+    EXPECT_EQ(49119, hits[6].getSource().toJson()["balance"].asInt());
+    EXPECT_EQ(49000, hits[7].getSource().toJson()["balance"].asInt());
+    EXPECT_EQ(48997, hits[8].getSource().toJson()["balance"].asInt());
+    EXPECT_EQ(48974, hits[9].getSource().toJson()["balance"].asInt());
 }
 
 TEST_F(SearchTest, TermAggTest)
@@ -374,9 +374,41 @@ TEST_F(SearchTest, TermAggTest)
     auto resp = dClient.search<Account>(param);
     auto aggResp = resp->getAggregationsResponse();
     ASSERT_EQ(1, aggResp.size());
-    EXPECT_STREQ("group_by_state", aggResp["group_by_state"].name().c_str());
-    EXPECT_EQ(770, aggResp["group_by_state"].sumOtherDocCount());
-    EXPECT_EQ(20, aggResp["group_by_state"].docCountErrorUpperBound());
-    EXPECT_EQ(27, aggResp["group_by_state"].buckets()[0].docCount());
-    EXPECT_STREQ("ID", aggResp["group_by_state"].buckets()[0].key().c_str());
+    auto bucketResponse = std::dynamic_pointer_cast<BucketAggregationsResponse>(
+        aggResp["group_by_state"]);
+    EXPECT_STREQ("group_by_state", bucketResponse->name().c_str());
+    EXPECT_EQ(770, bucketResponse->sumOtherDocCount());
+    EXPECT_EQ(20, bucketResponse->docCountErrorUpperBound());
+    EXPECT_EQ(27, bucketResponse->buckets()[0].docCount());
+    EXPECT_STREQ("ID", bucketResponse->buckets()[0].key().c_str());
+}
+
+TEST_F(SearchTest, TermAggWithAvgAggTest)
+{
+    using namespace tl::elasticsearch;
+    DocumentsClient dClient(
+        std::make_shared<HttpClient>("http://localhost:9200"));
+
+    SearchParam param("ds_index_name");
+    param.size(0).agg(TermsAggregations::newTermsAgg()
+                          ->name("group_by_state")
+                          ->field("state.keyword")
+                          ->addSubAggregations(AvgAggregations::newAvgAgg()
+                                                   ->name("average_balance")
+                                                   ->field("balance")));
+    auto resp = dClient.search<Account>(param);
+    auto aggResp = resp->getAggregationsResponse();
+    ASSERT_EQ(1, aggResp.size());
+    auto bucketResponse = std::dynamic_pointer_cast<BucketAggregationsResponse>(
+        aggResp["group_by_state"]);
+    EXPECT_STREQ("group_by_state", bucketResponse->name().c_str());
+    EXPECT_EQ(770, bucketResponse->sumOtherDocCount());
+    EXPECT_EQ(20, bucketResponse->docCountErrorUpperBound());
+    EXPECT_EQ(27, bucketResponse->buckets()[0].docCount());
+    EXPECT_STREQ("ID", bucketResponse->buckets()[0].key().c_str());
+    auto subAgg = bucketResponse->buckets()[0]
+                      .subAggregationsResponses()["average_balance"];
+    auto avgAgg =
+        std::dynamic_pointer_cast<MetricsAggregationsResponse>(subAgg);
+	EXPECT_EQ(24368.777777777777777777, avgAgg->value());
 }
