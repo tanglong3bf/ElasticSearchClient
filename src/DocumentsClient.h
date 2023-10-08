@@ -360,23 +360,6 @@ class GetParam
     std::string id_;
 };
 
-enum SortOrder
-{
-    ASC = 0,
-    DESC
-};
-
-inline std::string to_string(SortOrder sortOrder)
-{
-    switch (sortOrder)
-    {
-        case ASC:
-            return "asc";
-        case DESC:
-            return "desc";
-    }
-}
-
 class Sort
 {
   public:
@@ -439,7 +422,7 @@ class SearchParam
         {
             json["from"] = *from_;
         }
-        if (from_)
+        if (size_)
         {
             json["size"] = *size_;
         }

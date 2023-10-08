@@ -12,6 +12,23 @@
 namespace tl::elasticsearch
 {
 
+enum SortOrder
+{
+    DESC = 0,
+    ASC
+};
+
+inline std::string to_string(SortOrder sortOrder)
+{
+    switch (sortOrder)
+    {
+        case ASC:
+            return "asc";
+        case DESC:
+            return "desc";
+    }
+}
+
 class Aggregations
 {
   public:
@@ -28,6 +45,27 @@ class Aggregations
 
 using AggPtr = std::shared_ptr<Aggregations>;
 
+class AggregationsOrder
+{
+  public:
+    AggregationsOrder(const std::string &subAggregationsName,
+                      SortOrder order = ASC)
+        : subAggregationsName_(subAggregationsName), order_(order)
+    {
+    }
+
+    Json::Value toJson() const
+    {
+        Json::Value json;
+        json[subAggregationsName_] = to_string(order_);
+        return json;
+    }
+
+  private:
+    std::string subAggregationsName_;
+    SortOrder order_;
+};
+
 template <typename AggType>
 class BucketAggregations : public Aggregations,
                            public std::enable_shared_from_this<AggType>
@@ -36,6 +74,11 @@ class BucketAggregations : public Aggregations,
     virtual AggPtr addSubAggregations(AggPtr newSubAggregations)
     {
         subAggregations_[newSubAggregations->name()] = newSubAggregations;
+        return std::enable_shared_from_this<AggType>::shared_from_this();
+    }
+    auto order(AggregationsOrder order)
+    {
+        this->order_ = std::make_shared<AggregationsOrder>(order);
         return std::enable_shared_from_this<AggType>::shared_from_this();
     }
 
@@ -52,6 +95,7 @@ class BucketAggregations : public Aggregations,
 
   protected:
     std::unordered_map<std::string, AggPtr> subAggregations_;
+    std::shared_ptr<AggregationsOrder> order_;
 };
 
 class TermsAggregations : public BucketAggregations<TermsAggregations>
@@ -92,6 +136,10 @@ class TermsAggregations : public BucketAggregations<TermsAggregations>
         if (size_)
         {
             result[name_]["terms"]["size"] = *size_;
+        }
+        if (order_)
+        {
+            result[name_]["terms"]["order"] = order_->toJson();
         }
         if (subAggregations_.size() > 0)
         {
@@ -210,11 +258,11 @@ class Bucket
 class BucketAggregationsResponse : public AggregationsResponse
 {
   public:
-    std::size_t docCountErrorUpperBound() const
+    int32_t docCountErrorUpperBound() const
     {
         return docCountErrorUpperBound_;
     }
-    std::size_t sumOtherDocCount() const
+    int32_t sumOtherDocCount() const
     {
         return sumOtherDocCount_;
     }
@@ -246,8 +294,8 @@ class BucketAggregationsResponse : public AggregationsResponse
     }
 
   private:
-    std::size_t docCountErrorUpperBound_;
-    std::size_t sumOtherDocCount_;
+    int32_t docCountErrorUpperBound_;
+    int32_t sumOtherDocCount_;
     std::vector<Bucket> buckets_;
 };
 

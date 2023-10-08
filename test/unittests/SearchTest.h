@@ -410,5 +410,36 @@ TEST_F(SearchTest, TermAggWithAvgAggTest)
                       .subAggregationsResponses()["average_balance"];
     auto avgAgg =
         std::dynamic_pointer_cast<MetricsAggregationsResponse>(subAgg);
-	EXPECT_EQ(24368.777777777777777777, avgAgg->value());
+    EXPECT_EQ(24368.777777777777, avgAgg->value());
+}
+
+TEST_F(SearchTest, TermAggWithAvgAggTestAndOrder)
+{
+    using namespace tl::elasticsearch;
+    DocumentsClient dClient(
+        std::make_shared<HttpClient>("http://localhost:9200"));
+
+    SearchParam param("ds_index_name");
+    param.size(0).agg(TermsAggregations::newTermsAgg()
+                          ->name("group_by_state")
+                          ->field("state.keyword")
+                          ->order({"average_balance", DESC})
+                          ->addSubAggregations(AvgAggregations::newAvgAgg()
+                                                   ->name("average_balance")
+                                                   ->field("balance")));
+    auto resp = dClient.search<Account>(param);
+    auto aggResp = resp->getAggregationsResponse();
+    ASSERT_EQ(1, aggResp.size());
+    auto bucketResponse = std::dynamic_pointer_cast<BucketAggregationsResponse>(
+        aggResp["group_by_state"]);
+    EXPECT_STREQ("group_by_state", bucketResponse->name().c_str());
+    EXPECT_EQ(918, bucketResponse->sumOtherDocCount());
+    EXPECT_EQ(-1, bucketResponse->docCountErrorUpperBound());
+    EXPECT_EQ(6, bucketResponse->buckets()[0].docCount());
+    EXPECT_STREQ("AL", bucketResponse->buckets()[0].key().c_str());
+    auto subAgg = bucketResponse->buckets()[0]
+                      .subAggregationsResponses()["average_balance"];
+    auto avgAgg =
+        std::dynamic_pointer_cast<MetricsAggregationsResponse>(subAgg);
+    EXPECT_EQ(41418.166666666664, avgAgg->value());
 }
