@@ -35,6 +35,19 @@ class HttpClient
             &exceptionCallback,
         const Json::Value &requestBody = Json::Value(Json::objectValue));
 
+    // _bulk
+    Json::Value sendRequest(const std::string &path,
+                            drogon::HttpMethod method,
+                            const std::vector<Json::Value> &requestBody);
+
+    void sendRequest(
+        const std::string &path,
+        drogon::HttpMethod method,
+        const std::function<void(const Json::Value &)> &resultCallback,
+        const std::function<void(const ElasticSearchException &)>
+            &exceptionCallback,
+        const std::vector<Json::Value> &requestBody);
+
   private:
     std::string url_;
 };
