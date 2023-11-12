@@ -3,6 +3,7 @@
 #include <functional>
 #include <json/value.h>
 #include <memory>
+#include "Aggregation.h"
 #include "ElasticSearchException.h"
 #include "HttpClient.h"
 #include "Query.h"
@@ -359,11 +360,41 @@ class GetParam
     std::string id_;
 };
 
+class Sort
+{
+  public:
+    Sort(const std::string &field, SortOrder sortOrder)
+        : field_(field), sortOrder_(sortOrder)
+    {
+    }
+
+  public:
+    virtual Json::Value toJson() const
+    {
+        Json::Value json;
+        json[field_] = to_string(sortOrder_);
+        return json;
+    }
+
+    const std::string &field() const
+    {
+        return field_;
+    }
+
+    const SortOrder &sortOrder() const
+    {
+        return sortOrder_;
+    }
+
+  private:
+    std::string field_;
+    SortOrder sortOrder_;
+};
+
 class SearchParam
 {
   public:
-    SearchParam(const std::string &index, QueryPtr query)
-        : index_(index), query_(query)
+    SearchParam(const std::string &index) : index_(index)
     {
     }
 
@@ -373,14 +404,80 @@ class SearchParam
         return index_;
     }
 
-    const QueryPtr query() const
+    Json::Value toJson() const
     {
-        return query_;
+        Json::Value json;
+        if (query_)
+        {
+            json["query"] = query_->toJson();
+        }
+        if (sort_.size() > 0)
+        {
+            for (const auto &item : sort_)
+            {
+                json["sort"].append(item.toJson());
+            }
+        }
+        if (from_)
+        {
+            json["from"] = *from_;
+        }
+        if (size_)
+        {
+            json["size"] = *size_;
+        }
+        if (agg_)
+        {
+            json["aggs"] = agg_->toJson();
+        }
+        return json;
+    }
+
+    SearchParam &query(QueryPtr query)
+    {
+        query_ = query;
+        return *this;
+    }
+
+    SearchParam &sort(std::string field, SortOrder order = ASC)
+    {
+        for (auto iter = sort_.cbegin(); iter != sort_.cend(); ++iter)
+        {
+            if (iter->field() == field)
+            {
+                sort_.erase(iter);
+                break;
+            }
+        }
+        sort_.push_back(Sort(field, order));
+        return *this;
+    }
+
+    SearchParam &from(int32_t from)
+    {
+        from_ = std::make_shared<int32_t>(from);
+        return *this;
+    }
+
+    SearchParam &size(int32_t size)
+    {
+        size_ = std::make_shared<int32_t>(size);
+        return *this;
+    }
+
+    SearchParam &agg(AggPtr agg)
+    {
+        agg_ = agg;
+        return *this;
     }
 
   private:
     std::string index_;
-    const QueryPtr query_;
+    QueryPtr query_;
+    std::vector<Sort> sort_;
+    std::shared_ptr<int32_t> from_;
+    std::shared_ptr<int32_t> size_;
+    AggPtr agg_;
 };
 
 template <typename Tp>
@@ -483,6 +580,16 @@ class SearchResponse
                 }
             }
         }
+        if (json.isMember("aggregations"))
+        {
+            for (const auto &item : json["aggregations"].getMemberNames())
+            {
+                Json::Value temp;
+                temp[item] = json["aggregations"][item];
+                aggregations_[item] =
+                    AggregationsResponse::newAggregationsResponse(temp);
+            }
+        }
     }
 
     auto getTook()
@@ -509,6 +616,10 @@ class SearchResponse
     {
         return hits_;
     }
+    auto getAggregationsResponse()
+    {
+        return aggregations_;
+    }
 
   private:
     uint32_t took_;
@@ -517,6 +628,8 @@ class SearchResponse
     uint32_t hits__total_;
     std::shared_ptr<double> hits__max_score_;
     std::vector<Hit<Tp>> hits_;
+    std::unordered_map<std::string, std::shared_ptr<AggregationsResponse>>
+        aggregations_;
 };
 
 template <typename Tp>
@@ -599,8 +712,7 @@ class DocumentsClient
         path += param.index();
         path += "/_search";
 
-        Json::Value requestBody;
-        requestBody["query"] = param.query()->toJson();
+        Json::Value requestBody = param.toJson();
 
         httpClient_->sendRequest(
             path,

@@ -20,5 +20,30 @@ TEST(HttpClientTest, Test2)
 TEST(HttpClientTest, Test3)
 {
     tl::elasticsearch::HttpClient client("http://localhost:9201");
-    ASSERT_THROW(client.sendRequest("/", drogon::Get), tl::elasticsearch::ElasticSearchException);
+    ASSERT_THROW(client.sendRequest("/", drogon::Get),
+                 tl::elasticsearch::ElasticSearchException);
+}
+
+TEST(HttpClientTest, Test4)
+{
+    tl::elasticsearch::HttpClient client("http://localhost:9200");
+    std::vector<Json::Value> param;
+    Json::Value temp;
+    temp["create"]["_index"] = "test";
+    temp["create"]["_type"] = "_doc";
+    temp["create"]["_id"] = "3";
+    param.push_back(temp);
+    Json::Value temp2;
+    temp2["field1"] = "value3";
+    param.push_back(temp2);
+    ASSERT_NO_THROW(client.sendRequest("/_bulk", drogon::Post, param));
+}
+
+TEST(HttpClientTest, Test5)
+{
+    tl::elasticsearch::HttpClient client("http://localhost:9201");
+    ASSERT_THROW(client.sendRequest("/",
+                                    drogon::Get,
+                                    std::vector<Json::Value>()),
+                 tl::elasticsearch::ElasticSearchException);
 }
